@@ -1,9 +1,9 @@
 ```deck
-title: ahr-deck demo
+title: ah-r demo
 author: agent-habilis
 ```
 
-# ahr-deck
+# ah-r
 
 A PowerPoint-style deck, in your terminal.
 
@@ -27,7 +27,7 @@ title: Diagrams
 
 <mermaid>
 flowchart LR
-    A[Write .ahr-deck] --> B[ahr deck.ahr-deck]
+    A[Write .ah-r] --> B[ahr deck.ah-r]
     B --> C{Present}
     C --> D[Arrow keys]
     C --> E[q to quit]

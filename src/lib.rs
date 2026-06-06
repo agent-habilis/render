@@ -4,7 +4,7 @@
 //! binary is a thin shim over [`run_cli`]. It reads the input file given as
 //! its argument and selects a renderer from the extension: Mermaid diagrams via
 //! the [`figurehead`] crate (`.mmd`/`.mermaid`), Markdown via [`termimad`]
-//! (`.md`/`.markdown`), and full-screen presentations (`.ahr-deck`) navigated
+//! (`.md`/`.markdown`), and full-screen presentations (`.ah-r`) navigated
 //! with the arrow keys.
 
 // Internal modules stay `pub(crate)`: the curated public surface is just

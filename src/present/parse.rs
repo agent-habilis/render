@@ -1,4 +1,4 @@
-//! Parse an `.ahr-deck` file into a [`Deck`] of [`Slide`]s.
+//! Parse an `.ah-r` file into a [`Deck`] of [`Slide`]s.
 //!
 //! A deck is a **Markdown file with embedded XML islands**. It is split into
 //! slides on standalone `---` lines (`---` is *only* a slide separator), and

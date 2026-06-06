@@ -1,4 +1,4 @@
-//! Full-screen presentation mode for `.ahr-deck` files.
+//! Full-screen presentation mode for `.ah-r` files.
 //!
 //! [`run`] parses the deck, takes over the terminal with [`ratatui::init`] (raw
 //! mode + alternate screen + a restore-on-panic hook), and drives an [`App`]

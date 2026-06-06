@@ -1,8 +1,8 @@
 ```deck
-title: ahr-deck showcase
+title: ah-r showcase
 ```
 
-# ahr-deck showcase
+# ah-r showcase
 
 Code blocks, **live** shells, and real syntax highlighting — all in the
 terminal.
@@ -20,7 +20,7 @@ title: Plain code block
 An untagged fence renders as a styled (non-highlighted) block:
 
 ```
-$ ahr showcase.ahr-deck
+$ ahr showcase.ah-r
 rendering 11 slides…
 ```
 
@@ -98,7 +98,7 @@ title: HTML
 <!doctype html>
 <html lang="en">
   <body>
-    <h1 class="title">ahr-deck</h1>
+    <h1 class="title">ah-r</h1>
     <!-- a comment -->
     <p>Slides in your <strong>terminal</strong>.</p>
   </body>

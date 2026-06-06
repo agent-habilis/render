@@ -19,12 +19,12 @@ use crate::{present, render};
     // No file argument (e.g. a bare `ahr`) prints the help screen instead of a
     // terse missing-argument error.
     arg_required_else_help = true,
-    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`\n`.ahr-deck` opens a full-screen presentation (arrow keys navigate, q quits)\n\na tool by agent-habilis █🫈"
+    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`\n`.ah-r` opens a full-screen presentation (arrow keys navigate, q quits)\n\na tool by agent-habilis █🫈"
 )]
 pub(crate) struct Cli {
     /// Path to the input file. The extension selects the renderer:
     /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown,
-    /// `.ahr-deck` → full-screen presentation.
+    /// `.ah-r` → full-screen presentation.
     path: PathBuf,
 }
 
@@ -35,7 +35,7 @@ enum Format {
     Mermaid,
     /// A Markdown document, rendered as styled terminal text.
     Markdown,
-    /// An `.ahr-deck` presentation, navigated full-screen.
+    /// An `.ah-r` presentation, navigated full-screen.
     Deck,
 }
 
@@ -50,7 +50,7 @@ fn format_for_extension(path: &std::path::Path) -> Option<Format> {
     {
         Some("mmd" | "mermaid") => Some(Format::Mermaid),
         Some("md" | "markdown") => Some(Format::Markdown),
-        Some("ahr-deck") => Some(Format::Deck),
+        Some("ah-r") => Some(Format::Deck),
         _ => None,
     }
 }
@@ -67,7 +67,7 @@ pub(crate) fn dispatch(cli: Cli) -> Result<()> {
     // Resolve the renderer from the extension first, before reading.
     let Some(format) = format_for_extension(&path) else {
         bail!(
-            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, or .ahr-deck extension",
+            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, or .ah-r extension",
             path.display()
         );
     };
