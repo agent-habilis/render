@@ -3,15 +3,16 @@
 //! [`run`] parses the deck, takes over the terminal with [`ratatui::init`] (raw
 //! mode + alternate screen + a restore-on-panic hook), and drives an [`App`]
 //! loop. Each slide is split into [`Segment`]s: plain Markdown, plus the
-//! embedded XML elements — `<code>` (syntax-highlighted by an editor), `<tty>`
-//! (a live process drawn into a bordered box), and `<mermaid>` (a drawn
-//! diagram); the latter two via [`tty`] / [`crate::render`]. Arrow keys move
+//! embedded XML elements — `<code>` (statically syntax-highlighted via
+//! [`crate::render::highlight_code`]), `<tty>` (a live process drawn into a
+//! bordered box by [`tty`]), and `<mermaid>` (a drawn diagram). Arrow keys move
 //! between slides; `q`/`Esc` quits.
 //!
 //! The loop is tick-driven rather than blocking: between key presses it repaints
-//! so a running `<tty>`/`<code>` process streams live and the status indicator
-//! blinks. Static segments (Markdown/Mermaid) are rendered once per slide+width
-//! and cached. Navigating reconciles the running processes (see [`tty`]).
+//! so a running `<tty>` process streams live and the status indicator blinks.
+//! Static segments (Markdown, Mermaid, and `<code>`) are rendered once per
+//! slide+width and cached. Navigating reconciles the running processes (see
+//! [`tty`]).
 
 mod parse;
 mod tty;
@@ -26,10 +27,10 @@ use ratatui::widgets::{Block, Borders, Paragraph};
 use ratatui::{DefaultTerminal, Frame};
 
 use ansi_to_tui::IntoText;
-use tui_term::widget::{Cursor, PseudoTerminal};
+use tui_term::widget::PseudoTerminal;
 
 use crate::render;
-use parse::{Deck, RenderMode, Segment};
+use parse::{CodeBlock, Deck, Segment};
 use tty::{ManagedProc, ProcessManager};
 
 /// Horizontal margin (each side) kept clear of slide content.
@@ -80,16 +81,16 @@ struct App {
     static_render: StaticRender,
 }
 
-/// Memoized renders of the static segments (Markdown / Mermaid) for the current
-/// slide. These depend only on the segment source and the wrap width, so they
-/// are reused across the (up to ~10 Hz) repaints a running process triggers,
-/// rather than re-running termimad/figurehead every frame.
+/// Memoized renders of the static segments (Markdown / Mermaid / Code) for the
+/// current slide. These depend only on the segment source and the wrap width, so
+/// they are reused across the (up to ~10 Hz) repaints a running process
+/// triggers, rather than re-running termimad/figurehead/syntect every frame.
 #[derive(Debug, Default)]
 struct StaticRender {
     /// The `(slide, content_w)` the cache is valid for.
     key: Option<(usize, usize)>,
     /// By block index: the rendered `(text, width, height)`, or `None` for the
-    /// live `Tty`/`Code` segments (whose layout is recomputed each frame).
+    /// live `Tty` segments (whose layout is recomputed each frame).
     items: Vec<Option<(Text<'static>, u16, u16)>>,
 }
 
@@ -108,20 +109,21 @@ impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let total = self.deck.slides.len();
 
-        // Eagerly spawn `render=eager` code editors across all slides so those
-        // slides show already-highlighted code with no startup flash when reached.
+        // Spawn `prerender` tty processes across all slides up front, sized to an
+        // estimate of the content area, so a slow-starting program is already
+        // drawn (and warmed up) by the time its slide is reached.
         {
             let size = terminal.size().unwrap_or(Size::new(80, 24));
-            let eager_rows = size.height.saturating_sub(FOOTER_ROWS);
-            let eager_cols = u16::try_from(content_width(size.width)).unwrap_or(u16::MAX);
+            let pre_rows = size.height.saturating_sub(FOOTER_ROWS);
+            let pre_cols = u16::try_from(content_width(size.width)).unwrap_or(u16::MAX);
             for slide in 0..total {
                 let segments = self.deck.slides[slide].segments();
                 for (block_index, segment) in segments.iter().enumerate() {
-                    if let Segment::Code(block) = segment
-                        && block.render == RenderMode::Eager
+                    if let Segment::Tty(block) = segment
+                        && block.prerender
                     {
                         self.manager
-                            .ensure_code(slide, block_index, block, eager_rows, eager_cols);
+                            .prerender(slide, block_index, block, pre_rows, pre_cols);
                     }
                 }
             }
@@ -191,7 +193,8 @@ impl App {
             .map(|segment| match segment {
                 Segment::Markdown(src) => Some(markdown_item(src, content_w)),
                 Segment::Mermaid(src) => Some(mermaid_item(src)),
-                Segment::Tty(_) | Segment::Code(_) => None,
+                Segment::Code(block) => Some(code_item(block)),
+                Segment::Tty(_) => None,
             })
             .collect();
         self.static_render = StaticRender {
@@ -215,19 +218,31 @@ impl App {
                 .flex(Flex::Center)
                 .spacing(1)
                 .split(content);
+            // One centered text column, sized to the widest text item; every
+            // left-aligned item shares its left edge so prose and code line up.
+            let column_width = items
+                .iter()
+                .filter(|item| item.left_align)
+                .map(|item| item.width)
+                .max()
+                .unwrap_or(0);
             for (item, cell) in items.iter().zip(cells.iter()) {
-                let [centered] = Layout::horizontal([Constraint::Length(item.width)])
-                    .flex(Flex::Center)
-                    .areas(*cell);
+                let area = if item.left_align {
+                    let margin = cell.width.saturating_sub(column_width) / 2;
+                    let width = item.width.min(cell.width.saturating_sub(margin));
+                    Rect::new(cell.x + margin, cell.y, width, cell.height)
+                } else {
+                    let [centered] = Layout::horizontal([Constraint::Length(item.width)])
+                        .flex(Flex::Center)
+                        .areas(*cell);
+                    centered
+                };
                 match &item.kind {
                     ItemKind::Markdown(text) => {
-                        frame.render_widget(Paragraph::new(text.clone()), centered);
+                        frame.render_widget(Paragraph::new(text.clone()), area);
                     }
                     ItemKind::Tty(block_index) => {
-                        self.draw_tty(frame, centered, segments, *block_index, blink_on);
-                    }
-                    ItemKind::Code(block_index) => {
-                        self.draw_code(frame, centered, segments, *block_index);
+                        self.draw_tty(frame, area, segments, *block_index, blink_on);
                     }
                 }
             }
@@ -241,9 +256,10 @@ impl App {
         let mut items = Vec::new();
         for (block_index, segment) in segments.iter().enumerate() {
             match segment {
-                // Static segments are rendered once into `static_render` (keyed
-                // by slide + width) and reused across repaints.
-                Segment::Markdown(_) | Segment::Mermaid(_) => {
+                // Static segments (Markdown, Mermaid, and now syntax-highlighted
+                // Code) are rendered once into `static_render` (keyed by slide +
+                // width) and reused across repaints.
+                Segment::Markdown(_) | Segment::Mermaid(_) | Segment::Code(_) => {
                     if let Some(Some((text, width, height))) =
                         self.static_render.items.get(block_index)
                         && *height > 0
@@ -251,6 +267,9 @@ impl App {
                         items.push(Item {
                             width: (*width).min(content.width),
                             height: *height,
+                            // Text (prose + code) shares one left-aligned column;
+                            // diagrams stay centered on their own.
+                            left_align: matches!(segment, Segment::Markdown(_) | Segment::Code(_)),
                             kind: ItemKind::Markdown(text.clone()),
                         });
                     }
@@ -270,26 +289,8 @@ impl App {
                     items.push(Item {
                         width: cols.saturating_add(2).min(content.width),
                         height: rows.saturating_add(2).min(content.height),
+                        left_align: false,
                         kind: ItemKind::Tty(block_index),
-                    });
-                }
-                Segment::Code(block) => {
-                    // Borderless ("just the code"): the box is the editor interior.
-                    let proc = self.manager.code_proc(self.current, block_index);
-                    let (rows, cols) = proc.map_or_else(
-                        || {
-                            tty::code_interior(
-                                &block.code,
-                                content.height,
-                                u16::try_from(content_w).unwrap_or(u16::MAX),
-                            )
-                        },
-                        ManagedProc::interior,
-                    );
-                    items.push(Item {
-                        width: cols.min(content.width),
-                        height: rows.min(content.height),
-                        kind: ItemKind::Code(block_index),
                     });
                 }
             }
@@ -330,26 +331,6 @@ impl App {
         }
     }
 
-    /// Draw a code block: the editor's live screen, **borderless** — just the
-    /// syntax-highlighted code. Falls back to the raw code when no editor
-    /// spawned (e.g. `nvim` is not installed).
-    fn draw_code(&self, frame: &mut Frame<'_>, area: Rect, segments: &[Segment], block_index: usize) {
-        let Some(Segment::Code(block)) = segments.get(block_index) else {
-            return;
-        };
-        match self.manager.code_proc(self.current, block_index) {
-            Some(proc) => {
-                let parser = proc.lock_parser();
-                // Hide the editor's cursor: "just the code", no blinking block
-                // and no visible jump from the startup dismiss keystrokes.
-                let pseudo = PseudoTerminal::new(parser.screen())
-                    .cursor(Cursor::default().visibility(false));
-                frame.render_widget(pseudo, area);
-            }
-            None => frame.render_widget(Paragraph::new(block.code.clone()), area),
-        }
-    }
-
     /// Draw the man-style footer: a horizontal rule carrying the slide title on
     /// the left and `current/total` on the right. Both are titles on a top
     /// border, so `ratatui` handles their alignment and truncation.
@@ -376,6 +357,11 @@ impl App {
 struct Item {
     width: u16,
     height: u16,
+    /// Share the left edge of the text column instead of being centered on its
+    /// own. Set for all text (prose Markdown and `<code>`) so they line up
+    /// flush-left as one column; `<mermaid>` diagrams and `<tty>` boxes stay
+    /// centered.
+    left_align: bool,
     kind: ItemKind,
 }
 
@@ -384,14 +370,18 @@ enum ItemKind {
     Markdown(Text<'static>),
     /// The segment index of a `tty` block (looked up again to render).
     Tty(usize),
-    /// The segment index of a code block (looked up again to render).
-    Code(usize),
 }
 
 /// A Markdown segment rendered (plainly — no embedded-diagram handling) to a
 /// `ratatui` [`Text`] with its measured size.
 fn markdown_item(src: &str, content_w: usize) -> (Text<'static>, u16, u16) {
     block_text(&render::markdown_plain(src, content_w))
+}
+
+/// A `<code>` segment syntax-highlighted to a `ratatui` [`Text`] with its
+/// measured size. Borderless — just the highlighted code.
+fn code_item(block: &CodeBlock) -> (Text<'static>, u16, u16) {
+    block_text(&render::highlight_code(&block.lang, &block.code))
 }
 
 /// A `<mermaid>` segment drawn to a `ratatui` [`Text`] with its measured size,
@@ -511,5 +501,18 @@ mod tests {
         // A width change re-keys the cache.
         app.refresh_static_render(&segments, 60);
         assert_eq!(app.static_render.key, Some((0, 60)));
+    }
+
+    #[test]
+    fn code_segment_is_cached_statically() {
+        // A `<code>` block is highlighted statically now, so it caches like
+        // Markdown rather than being a live (None) segment.
+        let deck = parse_deck("<code lang=\"rust\">\nfn main() {}\n</code>");
+        let segments = deck.slides[0].segments();
+        let mut app = App::new(deck);
+
+        app.refresh_static_render(&segments, 80);
+        assert_eq!(app.static_render.items.len(), 1);
+        assert!(app.static_render.items[0].is_some(), "code must be cached");
     }
 }

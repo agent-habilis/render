@@ -1,0 +1,60 @@
+```deck
+title: nvim, live in a slide
+```
+
+# Your real editor, on a slide
+
+`<code>` blocks are highlighted statically (fast, deterministic). But when you
+want your **actual** Neovim — your colorscheme, your Treesitter, your config —
+just run it in a `<tty>` block.
+
+Arrow keys to navigate, `q` to quit.
+
+---
+
+```deck:slide
+title: Static highlight
+```
+
+## The same file, highlighted statically
+
+A `<code>` block renders instantly with Tokyo Night colors — no process, no
+startup flash:
+
+<code lang="lua">
+-- bootstrap lazy.nvim, LazyVim and your plugins
+require("config.lazy")
+</code>
+
+Compare it with the next slide, where the very same file is drawn by your
+**actual** nvim.
+
+---
+
+```deck:slide
+title: init.lua
+```
+
+## `~/.config/nvim/init.lua`, rendered by nvim itself
+
+<tty title="init.lua" rows="20" cols="76" prerender keys="\r:lua for _,w in ipairs(vim.api.nvim_list_wins()) do local c=vim.api.nvim_win_get_config(w) if c.relative~='' then pcall(vim.api.nvim_win_close,w,true) end end\rgg">
+nvim -R -n -i NONE -c 'autocmd User VeryLazy ++once set laststatus=0 showtabline=0 cmdheight=0 noruler noshowmode signcolumn=no foldcolumn=0 statuscolumn= nonumber norelativenumber nocursorline nocursorcolumn nolist nowrap fillchars=eob:\ | redraw!' "$HOME/.config/nvim/init.lua"
+</tty>
+
+The `-c` flag strips nvim's UI chrome; `keys=` feeds keystrokes after startup to
+close any popups (LSP progress, notifications) and jump back to the top.
+
+---
+
+# How it works
+
+- `<tty>` runs `$SHELL -lc <command>` in a real pseudo-terminal.
+- `keys="…"` sends keystrokes into that PTY a few times during startup
+  (`\r`, `\n`, `\t`, `\e` escapes are decoded) — generic enough to drive any
+  TUI, not just nvim.
+- Nothing in your config is modified: it is opened read-only (`-R`), with no
+  swap file and no shada (`-n -i NONE`).
+- `prerender` starts nvim at deck load (not on first view) and keeps it alive
+  for the session, so the slide is already drawn — no startup flash — when you
+  arrive. It is independent of `id`/`persist`: a prerendered process lives for
+  the whole session at its own slide, one per occurrence.

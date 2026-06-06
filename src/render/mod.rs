@@ -1,11 +1,16 @@
 //! Input renderers. Each function turns an input string into the text that
 //! `ahr` prints: [`mermaid`] draws diagrams, [`markdown`] styles Markdown for
-//! the terminal (drawing any embedded ` ```mermaid ` blocks inline).
+//! the terminal (drawing any embedded ` ```mermaid ` blocks inline), and
+//! [`highlight_code`] syntax-highlights a `<code>` block.
 
 use std::io::IsTerminal;
 use std::ops::Range;
 
 use anyhow::{Context, Result};
+
+mod highlight;
+
+pub(crate) use highlight::highlight_code;
 
 /// Render a Mermaid diagram to terminal text.
 ///

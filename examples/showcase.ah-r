@@ -74,7 +74,7 @@ title: Rust
 
 ## Rust, syntax highlighted
 
-<code lang="rust" render="eager">
+<code lang="rust">
 use std::collections::HashMap;
 
 fn main() {

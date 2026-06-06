@@ -12,7 +12,7 @@
 //! Everything else is ordinary Markdown, except three embedded XML elements that
 //! express things Markdown cannot — see [`Segment`]:
 //!
-//! - `<code lang="…" render="…">…</code>` — syntax-highlighted code.
+//! - `<code lang="…">…</code>` — syntax-highlighted code.
 //! - `<tty …>…</tty>` — a live command in a pseudo-terminal.
 //! - `<mermaid>…</mermaid>` — a drawn diagram.
 //!
@@ -57,32 +57,20 @@ pub(crate) enum Segment {
     Markdown(String),
     /// A `<tty>` element: a command to run live in a boxed pseudo-terminal.
     Tty(TtyBlock),
-    /// A `<code>` element: code rendered with real syntax highlighting by an
-    /// editor (see [`super::tty`]).
+    /// A `<code>` element: code rendered with static syntax highlighting (see
+    /// [`crate::render::highlight_code`]).
     Code(CodeBlock),
     /// A `<mermaid>` element: its source, drawn as a diagram.
     Mermaid(String),
 }
 
-/// A `<code>` element: its `lang`, the code body, and when it is rendered.
+/// A `<code>` element: its `lang` and the code body.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CodeBlock {
     /// `lang` — the language token (e.g. `rust`, `html`, `js`) for highlighting.
     pub(crate) lang: String,
     /// The code between the tags.
     pub(crate) code: String,
-    /// When the highlighting editor is spawned (`render` attribute).
-    pub(crate) render: RenderMode,
-}
-
-/// When a code block's syntax-highlighting editor is spawned.
-#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(crate) enum RenderMode {
-    /// Spawn on first view of the slide (`render="lazy"`).
-    #[default]
-    Lazy,
-    /// Spawn at deck load and keep in memory (`render="eager"`).
-    Eager,
 }
 
 /// A `<tty>` element: its attributes plus the command body.
@@ -93,6 +81,12 @@ pub(crate) struct TtyBlock {
     /// `persist` — keep the process alive across a slide change when the next
     /// slide has a `<tty>` with the same `id`.
     pub(crate) persist: bool,
+    /// `prerender` — spawn the process at deck load (not on first view) and keep
+    /// it alive for the whole session, so a slow-starting program is already
+    /// drawn by the time its slide is reached. Independent of `persist`/`id`
+    /// (and takes precedence over them): a prerendered process is keyed by its
+    /// `(slide, block)` position, one per occurrence — it is not shared by `id`.
+    pub(crate) prerender: bool,
     /// `title` — box title; falls back to the command's first token.
     pub(crate) title: Option<String>,
     /// `status` — fixed status text; falls back to the live process status.
@@ -101,6 +95,10 @@ pub(crate) struct TtyBlock {
     pub(crate) rows: Option<u16>,
     /// `cols` — box interior width; a default is used when absent.
     pub(crate) cols: Option<u16>,
+    /// `keys` — keystrokes fed into the process after it starts (raw, with
+    /// `\r`/`\n`/`\t`/`\e`/`\\` escapes); used to drive a TUI, e.g. to dismiss
+    /// an editor's startup popups. Decoded by [`super::tty`].
+    pub(crate) keys: Option<String>,
     /// The shell command/script between the tags.
     pub(crate) command: String,
 }
@@ -232,23 +230,14 @@ fn xml_close(trimmed: &str, element: Element) -> bool {
     trimmed == element.close_tag()
 }
 
-/// Parse a `<code>` element's attributes (`lang`, `render`) plus its body.
+/// Parse a `<code>` element's attributes (`lang`) plus its body.
 fn parse_code_attrs(attrs: &str, code: String) -> CodeBlock {
-    let tokens = tokenize_attrs(attrs);
-    let lang = tokens
-        .iter()
+    let lang = tokenize_attrs(attrs)
+        .into_iter()
         .find(|(key, _)| key == "lang")
-        .and_then(|(_, value)| value.clone())
+        .and_then(|(_, value)| value)
         .unwrap_or_default();
-    let render = tokens
-        .iter()
-        .find(|(key, _)| key == "render")
-        .and_then(|(_, value)| value.as_deref())
-        .map_or(RenderMode::Lazy, |value| match value {
-            "eager" => RenderMode::Eager,
-            _ => RenderMode::Lazy,
-        });
-    CodeBlock { lang, code, render }
+    CodeBlock { lang, code }
 }
 
 /// Parse a `<tty>` element's attributes into a [`TtyBlock`]. Attributes are
@@ -263,10 +252,12 @@ fn parse_tty_attrs(attrs: &str, command: String) -> TtyBlock {
         match key.as_str() {
             "id" => block.id = value,
             "persist" => block.persist = value.as_deref() != Some("false"),
+            "prerender" => block.prerender = value.as_deref() != Some("false"),
             "title" => block.title = value,
             "status" => block.status = value,
             "rows" => block.rows = value.and_then(|val| val.parse().ok()),
             "cols" => block.cols = value.and_then(|val| val.parse().ok()),
+            "keys" => block.keys = value,
             _ => {}
         }
     }
@@ -507,7 +498,7 @@ fn is_identifier(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{RenderMode, Segment, parse_deck, split_segments};
+    use super::{Segment, parse_deck, split_segments};
 
     fn tty(segment: &Segment) -> &super::TtyBlock {
         match segment {
@@ -565,24 +556,30 @@ mod tests {
     }
 
     #[test]
-    fn code_element_carries_lang_and_render() {
+    fn code_element_carries_lang() {
         let segs = split_segments("# Title\n\n<code lang=\"rust\">\nfn main() {}\n</code>");
         assert_eq!(segs.len(), 2);
         assert_eq!(segs[0], Segment::Markdown("# Title\n".into()));
         let block = code(&segs[1]);
         assert_eq!(block.lang, "rust");
         assert_eq!(block.code, "fn main() {}");
-        assert_eq!(block.render, RenderMode::Lazy); // default
     }
 
     #[test]
-    fn render_attribute_selects_eager_or_lazy() {
-        let eager = "<code lang=\"rust\" render=\"eager\">\nx\n</code>";
-        let lazy = "<code lang=\"rust\" render=\"lazy\">\nx\n</code>";
-        let bogus = "<code lang=\"rust\" render=\"bogus\">\nx\n</code>";
-        assert_eq!(code(&split_segments(eager)[0]).render, RenderMode::Eager);
-        assert_eq!(code(&split_segments(lazy)[0]).render, RenderMode::Lazy);
-        assert_eq!(code(&split_segments(bogus)[0]).render, RenderMode::Lazy);
+    fn tty_prerender_flag_is_parsed() {
+        assert!(tty(&split_segments("<tty prerender>\nhtop\n</tty>")[0]).prerender);
+        assert!(
+            !tty(&split_segments("<tty prerender=\"false\">\nhtop\n</tty>")[0]).prerender
+        );
+        assert!(!tty(&split_segments("<tty>\nhtop\n</tty>")[0]).prerender);
+    }
+
+    #[test]
+    fn tty_keys_attribute_is_captured_raw() {
+        let body = "<tty keys=\"\\r:q\\r\">\nnvim file\n</tty>";
+        let block = tty(&split_segments(body)[0]).clone();
+        // Stored verbatim (escapes decoded later, by the tty layer).
+        assert_eq!(block.keys.as_deref(), Some("\\r:q\\r"));
     }
 
     #[test]
