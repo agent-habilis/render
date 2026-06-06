@@ -1,26 +1,26 @@
-//! Live process execution for `<tty>` blocks.
+//! Live process execution for `<tty>` components.
 //!
-//! Each block runs a shell command in a real pseudo-terminal ([`portable_pty`]),
+//! Each component runs a shell command in a real pseudo-terminal ([`portable_pty`]),
 //! so programs see a TTY and emit colors / full-screen redraws as usual. A
 //! per-process reader thread feeds the raw bytes into a [`vt100`] parser that
-//! maintains a virtual screen grid; the present loop paints that grid into a
+//! maintains a virtual screen grid; the deck runtime paints that grid into a
 //! bordered box (see [`super`]).
 //!
-//! A block may carry `keys=` — keystrokes fed into the process shortly after it
+//! A component may carry `keys=` — keystrokes fed into the process shortly after it
 //! starts (decoded by [`decode_keys`]), useful to drive a TUI from a slide, e.g.
-//! to dismiss an editor's startup popups. The present loop never *reads* the
+//! to dismiss an editor's startup popups. The deck runtime never *reads* the
 //! PTY, so `keys` is a fixed startup script, not interactivity.
 //!
 //! [`ProcessManager`] owns the running processes and implements the cross-slide
 //! lifecycle:
 //!
 //! - **Ephemeral** processes (no `id`, or no `persist`) are keyed by their
-//!   `(slide, block)` position and killed when that slide stops being current.
+//!   `(slide, component)` position and killed when that slide stops being current.
 //! - **Persistent** processes (`persist` *and* an `id`) are keyed by `id` and
 //!   survive a slide change only when the destination slide reuses that `id` —
 //!   then the same process (and its accumulated output) is re-mounted.
 //! - **Prerendered** processes (`prerender`) are spawned at deck load, keyed by
-//!   their `(slide, block)` position, and kept alive for the whole session, so
+//!   their `(slide, component)` position, and kept alive for the whole session, so
 //!   a slow-starting program is already drawn when its slide is reached.
 //!
 //! A [`ManagedProc`] kills its child on [`Drop`], so dropping it from either map
@@ -35,16 +35,118 @@ use std::time::{Duration, Instant};
 
 use anyhow::{Context, Result};
 use portable_pty::{Child, CommandBuilder, MasterPty, PtySize, native_pty_system};
+use ratatui::Frame;
+use ratatui::layout::Rect;
+use ratatui::text::Line;
+use ratatui::widgets::{Block, Paragraph};
+use tui_term::widget::PseudoTerminal;
 
-use super::parse::{Segment, TtyBlock};
+use super::{Cached, FrameCtx, Item};
+use crate::deck::Segment;
 
-/// Default box interior when a block sets no `rows=`/`cols=`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct TtyComponent {
+    /// Links the same logical process across slides (for `persist`).
+    pub(crate) id: Option<String>,
+    /// Keep the process alive across a slide change when the next slide has a
+    /// `<tty>` with the same `id`.
+    pub(crate) persist: bool,
+    /// Spawn at deck load (not first view) and keep alive for the whole session.
+    /// Takes precedence over `persist`/`id`: keyed by position, not shared.
+    pub(crate) prerender: bool,
+    /// Box title; falls back to the command's first token.
+    pub(crate) title: Option<String>,
+    /// Fixed status text; falls back to the live process status.
+    pub(crate) status: Option<String>,
+    /// Box interior, in cells; a default is used when absent.
+    pub(crate) rows: Option<u16>,
+    pub(crate) cols: Option<u16>,
+    /// Keystrokes fed into the process after it starts (raw, with
+    /// `\r`/`\n`/`\t`/`\e`/`\\` escapes), to drive a TUI. Decoded by
+    /// [`decode_keys`].
+    pub(crate) keys: Option<String>,
+    pub(crate) command: String,
+}
+
+impl TtyComponent {
+    /// Parse a `<tty>` component's attributes. Attributes are whitespace-separated
+    /// `key="value"` pairs or bare flags (e.g. `persist`); unknown keys ignored.
+    pub(crate) fn parse(attrs: &str, command: String) -> Self {
+        let mut component = Self {
+            command,
+            ..Self::default()
+        };
+        for (key, value) in super::tokenize_attrs(attrs) {
+            match key.as_str() {
+                "id" => component.id = value,
+                "persist" => component.persist = value.as_deref() != Some("false"),
+                "prerender" => component.prerender = value.as_deref() != Some("false"),
+                "title" => component.title = value,
+                "status" => component.status = value,
+                "rows" => component.rows = value.and_then(|val| val.parse().ok()),
+                "cols" => component.cols = value.and_then(|val| val.parse().ok()),
+                "keys" => component.keys = value,
+                _ => {}
+            }
+        }
+        component
+    }
+
+    /// The box title: the `title` override, else the command's first token, else
+    /// `"tty"`.
+    pub(crate) fn display_title(&self) -> &str {
+        if let Some(title) = &self.title {
+            return title;
+        }
+        self.command.split_whitespace().next().unwrap_or("tty")
+    }
+}
+
+impl super::Component for TtyComponent {
+    // Drawn live from the `ProcessManager`; nothing to pre-render.
+    fn render(&self, _content_w: usize) -> Cached {
+        Cached::Live
+    }
+
+    fn lay_out(&self, ctx: &FrameCtx<'_>) -> Option<Item> {
+        let proc = ctx.manager.proc_for(ctx.current, ctx.index, self);
+        let (rows, cols) = proc.map_or_else(
+            || {
+                box_interior(
+                    self,
+                    ctx.content.height.saturating_sub(2),
+                    u16::try_from(ctx.content_w).unwrap_or(u16::MAX).saturating_sub(2),
+                )
+            },
+            ManagedProc::interior,
+        );
+        Some(Item {
+            width: cols.saturating_add(2).min(ctx.content.width),
+            height: rows.saturating_add(2).min(ctx.content.height),
+            left_align: false,
+            text: None,
+        })
+    }
+
+    fn draw(&self, frame: &mut Frame<'_>, area: Rect, _item: &Item, ctx: &FrameCtx<'_>) {
+        let proc = ctx.manager.proc_for(ctx.current, ctx.index, self);
+        draw_tty(frame, area, self, proc, ctx.blink_on);
+    }
+
+    fn is_active(&self, ctx: &FrameCtx<'_>) -> bool {
+        ctx.manager
+            .proc_for(ctx.current, ctx.index, self)
+            .is_some_and(ManagedProc::is_running)
+    }
+}
+
+/// Default box interior when a component sets no `rows=`/`cols=`.
 const DEFAULT_ROWS: u16 = 10;
 const DEFAULT_COLS: u16 = 80;
 /// Lines of scrollback the emulator keeps; the box shows the bottom of it.
 const SCROLLBACK: usize = 1000;
 
-/// Cumulative delays (ms) at which a block's `keys=` are (re)sent into the PTY.
+/// Cumulative delays (ms) at which a component's `keys=` are (re)sent into the PTY.
 /// Spanning a program's async startup means late-appearing popups are caught
 /// too, not just whatever is on screen the instant the process spawns.
 const KEYS_DELAYS: &[u64] = &[250, 300, 350, 450, 600, 600];
@@ -152,7 +254,7 @@ impl ManagedProc {
     /// Lock the emulator so the caller can read its screen for rendering.
     pub(crate) fn lock_parser(&self) -> MutexGuard<'_, vt100::Parser> {
         // A panicked reader thread is the only poisoning source; recover the
-        // grid anyway so a dead block still renders its last frame.
+        // grid anyway so a dead component still renders its last frame.
         self.parser
             .lock()
             .unwrap_or_else(std::sync::PoisonError::into_inner)
@@ -289,11 +391,11 @@ fn decode_keys(raw: &str) -> Vec<u8> {
 /// Owns every running process and applies the per-slide lifecycle.
 #[derive(Debug, Default)]
 pub(crate) struct ProcessManager {
-    /// Ephemeral `tty` processes, keyed by `(slide index, block index)`.
+    /// Ephemeral `tty` processes, keyed by `(slide index, component index)`.
     ephemeral: HashMap<(usize, usize), ManagedProc>,
     /// Persistent `tty` processes, keyed by their `id`.
     persistent: HashMap<String, ManagedProc>,
-    /// Prerendered `tty` processes, keyed by `(slide index, block index)`;
+    /// Prerendered `tty` processes, keyed by `(slide index, component index)`;
     /// spawned at deck load and kept for the whole session.
     prerendered: HashMap<(usize, usize), ManagedProc>,
 }
@@ -315,7 +417,7 @@ impl ProcessManager {
         self.ephemeral.retain(|(slide, _), _| *slide == current);
     }
 
-    /// Ensure every `tty` block on slide `current` has a process, sized to fit
+    /// Ensure every `tty` component on slide `current` has a process, sized to fit
     /// the `content_rows`x`content_cols` content area minus the box border,
     /// spawning the missing ones and resizing/polling the rest.
     pub(crate) fn ensure(
@@ -325,43 +427,43 @@ impl ProcessManager {
         content_rows: u16,
         content_cols: u16,
     ) {
-        for (block_index, segment) in segments.iter().enumerate() {
-            let Segment::Tty(block) = segment else {
+        for (index, segment) in segments.iter().enumerate() {
+            let Segment::Tty(component) = segment else {
                 continue;
             };
             let (rows, cols) = box_interior(
-                block,
+                component,
                 content_rows.saturating_sub(2),
                 content_cols.saturating_sub(2),
             );
-            let keys = block.keys.as_deref().map(decode_keys);
+            let keys = component.keys.as_deref().map(decode_keys);
             let keys = keys.as_deref();
-            if block.prerender {
+            if component.prerender {
                 // Spawned at deck load (see `prerender`); here just resize to the
                 // real box and poll. Spawn defensively if load-time spawn was
-                // skipped (e.g. a block only reachable after a resize).
-                let key = (current, block_index);
+                // skipped (e.g. a component only reachable after a resize).
+                let key = (current, index);
                 if let Some(proc) = self.prerendered.get_mut(&key) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&block.command, keys, rows, cols) {
+                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
                     proc.poll();
                     self.prerendered.insert(key, proc);
                 }
-            } else if let Some(id) = persistent_id(block) {
+            } else if let Some(id) = persistent_id(component) {
                 if let Some(proc) = self.persistent.get_mut(id) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&block.command, keys, rows, cols) {
+                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
                     proc.poll();
                     self.persistent.insert(id.to_owned(), proc);
                 }
             } else {
-                let key = (current, block_index);
+                let key = (current, index);
                 if let Some(proc) = self.ephemeral.get_mut(&key) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&block.command, keys, rows, cols) {
+                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
                     proc.poll();
                     self.ephemeral.insert(key, proc);
                 }
@@ -369,73 +471,89 @@ impl ProcessManager {
         }
     }
 
-    /// Spawn the `prerender` process for one `tty` block at deck load, sized to
+    /// Spawn the `prerender` process for one `tty` component at deck load, sized to
     /// an estimate of its eventual box (resized exactly by [`Self::ensure`] when
     /// the slide is shown). A no-op once the process exists; a failed spawn is
     /// simply retried by [`Self::ensure`] on arrival.
     pub(crate) fn prerender(
         &mut self,
         slide: usize,
-        block_index: usize,
-        block: &TtyBlock,
+        index: usize,
+        component: &TtyComponent,
         content_rows: u16,
         content_cols: u16,
     ) {
-        let key = (slide, block_index);
+        let key = (slide, index);
         if self.prerendered.contains_key(&key) {
             return;
         }
         let (rows, cols) = box_interior(
-            block,
+            component,
             content_rows.saturating_sub(2),
             content_cols.saturating_sub(2),
         );
-        let keys = block.keys.as_deref().map(decode_keys);
-        if let Ok(mut proc) = ManagedProc::spawn(&block.command, keys.as_deref(), rows, cols) {
+        let keys = component.keys.as_deref().map(decode_keys);
+        if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys.as_deref(), rows, cols) {
             proc.poll();
             self.prerendered.insert(key, proc);
         }
     }
 
-    /// The process backing a `tty` block on slide `current`, if it spawned.
+    /// The process backing a `tty` component on slide `current`, if it spawned.
     pub(crate) fn proc_for(
         &self,
         current: usize,
-        block_index: usize,
-        block: &TtyBlock,
+        index: usize,
+        component: &TtyComponent,
     ) -> Option<&ManagedProc> {
-        if block.prerender {
-            return self.prerendered.get(&(current, block_index));
+        if component.prerender {
+            return self.prerendered.get(&(current, index));
         }
-        match persistent_id(block) {
+        match persistent_id(component) {
             Some(id) => self.persistent.get(id),
-            None => self.ephemeral.get(&(current, block_index)),
+            None => self.ephemeral.get(&(current, index)),
         }
     }
 
-    /// Whether any process on slide `current` is still running (so the loop
-    /// keeps repainting for live output and the blinking status indicator).
-    pub(crate) fn any_running(&self, current: usize, segments: &[Segment]) -> bool {
-        segments.iter().enumerate().any(|(block_index, segment)| match segment {
-            Segment::Tty(block) => self
-                .proc_for(current, block_index, block)
-                .is_some_and(ManagedProc::is_running),
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
-                false
-            }
-        })
+}
+
+/// Draw a `<tty>` box: a bordered [`Block`] (title on top, status bar on the
+/// bottom) wrapping the process's live emulator screen, or a placeholder if the
+/// process failed to start.
+pub(crate) fn draw_tty(
+    frame: &mut Frame<'_>,
+    area: Rect,
+    component: &TtyComponent,
+    proc: Option<&ManagedProc>,
+    blink_on: bool,
+) {
+    let status = match (&component.status, proc) {
+        (Some(fixed), _) => format!(" {fixed} "),
+        (None, Some(proc)) => proc.status_line(blink_on),
+        (None, None) => " starting… ".to_owned(),
+    };
+    let bordered = Block::bordered()
+        .title(Line::from(format!(" {} ", component.display_title())))
+        .title_bottom(Line::from(status).centered());
+    match proc {
+        Some(proc) => {
+            let parser = proc.lock_parser();
+            let pseudo = PseudoTerminal::new(parser.screen()).block(bordered);
+            frame.render_widget(pseudo, area);
+        }
+        None => frame.render_widget(Paragraph::new("failed to start").block(bordered), area),
     }
 }
 
-/// The box interior for a block: its `rows=`/`cols=` (or defaults), each clamped
+/// The box interior for a component: its `rows=`/`cols=` (or defaults), each clamped
 /// to the space available and at least 1.
-pub(crate) fn box_interior(block: &TtyBlock, max_rows: u16, max_cols: u16) -> (u16, u16) {
-    let rows = block
+pub(crate) fn box_interior(component: &TtyComponent, max_rows: u16, max_cols: u16) -> (u16, u16) {
+    let rows = component
         .rows
         .unwrap_or(DEFAULT_ROWS)
         .min(max_rows.max(1))
         .max(1);
-    let cols = block
+    let cols = component
         .cols
         .unwrap_or(DEFAULT_COLS)
         .min(max_cols.max(1))
@@ -443,11 +561,11 @@ pub(crate) fn box_interior(block: &TtyBlock, max_rows: u16, max_cols: u16) -> (u
     (rows, cols)
 }
 
-/// The persistence key for a block: `Some(id)` only when it both `persist`s and
+/// The persistence key for a component: `Some(id)` only when it both `persist`s and
 /// carries an `id` (the link required to survive a slide change).
-fn persistent_id(block: &TtyBlock) -> Option<&str> {
-    if block.persist {
-        block.id.as_deref()
+fn persistent_id(component: &TtyComponent) -> Option<&str> {
+    if component.persist {
+        component.id.as_deref()
     } else {
         None
     }
@@ -459,7 +577,7 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
     segments
         .iter()
         .filter_map(|segment| match segment {
-            Segment::Tty(block) => persistent_id(block).map(str::to_owned),
+            Segment::Tty(component) => persistent_id(component).map(str::to_owned),
             Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
                 None
             }
@@ -470,30 +588,31 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
 #[cfg(test)]
 mod tests {
     use super::{box_interior, decode_keys, keep_persistent_ids, persistent_id};
-    use crate::present::parse::{Segment, TtyBlock};
+    use super::TtyComponent;
+    use crate::deck::Segment;
 
-    fn block(id: Option<&str>, persist: bool) -> TtyBlock {
-        TtyBlock {
+    fn component(id: Option<&str>, persist: bool) -> TtyComponent {
+        TtyComponent {
             id: id.map(str::to_owned),
             persist,
-            ..TtyBlock::default()
+            ..TtyComponent::default()
         }
     }
 
     #[test]
     fn persistent_only_when_persist_and_id_present() {
-        assert_eq!(persistent_id(&block(Some("a"), true)), Some("a"));
-        assert_eq!(persistent_id(&block(Some("a"), false)), None);
-        assert_eq!(persistent_id(&block(None, true)), None);
+        assert_eq!(persistent_id(&component(Some("a"), true)), Some("a"));
+        assert_eq!(persistent_id(&component(Some("a"), false)), None);
+        assert_eq!(persistent_id(&component(None, true)), None);
     }
 
     #[test]
     fn keep_set_collects_persistent_ids_only() {
         let segments = vec![
             Segment::Markdown("# hi".into()),
-            Segment::Tty(block(Some("counter"), true)),
-            Segment::Tty(block(Some("scratch"), false)), // not persistent
-            Segment::Tty(block(None, true)),             // no id to link
+            Segment::Tty(component(Some("counter"), true)),
+            Segment::Tty(component(Some("scratch"), false)), // not persistent
+            Segment::Tty(component(None, true)),             // no id to link
         ];
         let keep = keep_persistent_ids(&segments);
         assert_eq!(keep.len(), 1);
@@ -502,18 +621,16 @@ mod tests {
 
     #[test]
     fn box_interior_uses_defaults_then_clamps() {
-        // Default rows (10), explicit wide cols clamped to what's available.
-        let wide = TtyBlock {
+        let wide = TtyComponent {
             cols: Some(200),
-            ..TtyBlock::default()
+            ..TtyComponent::default()
         };
         assert_eq!(box_interior(&wide, 40, 50), (10, 50));
 
-        // Explicit small size kept as-is.
-        let small = TtyBlock {
+        let small = TtyComponent {
             rows: Some(4),
             cols: Some(20),
-            ..TtyBlock::default()
+            ..TtyComponent::default()
         };
         assert_eq!(box_interior(&small, 40, 80), (4, 20));
     }
@@ -521,7 +638,6 @@ mod tests {
     #[test]
     fn decode_keys_interprets_known_escapes() {
         assert_eq!(decode_keys("a\\rb\\n\\t\\e\\\\"), b"a\rb\n\t\x1b\\");
-        // An unknown escape keeps both characters; a lone trailing backslash too.
         assert_eq!(decode_keys("\\q"), b"\\q");
         assert_eq!(decode_keys("x\\"), b"x\\");
     }

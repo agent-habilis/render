@@ -71,7 +71,6 @@ mod tests {
     #[test]
     fn known_language_emits_truecolor_and_keeps_text() {
         let out = highlight_code("rust", "fn main() {}\n");
-        // 24-bit foreground escapes prove the Tokyo Night theme is applied.
         assert!(out.contains("\x1b[38;2;"), "expected 24-bit color escapes");
         assert!(out.contains("fn"), "source text must survive highlighting");
         assert!(out.ends_with("\x1b[0m"), "must end with a reset");
@@ -79,7 +78,6 @@ mod tests {
 
     #[test]
     fn unknown_language_falls_back_to_plain_text() {
-        // No panic, and the code is preserved even with no matching syntax.
         let out = highlight_code("definitely-not-a-language", "just some text\n");
         assert!(out.contains("just some text"));
     }

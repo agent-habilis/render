@@ -7,26 +7,10 @@
 //! (`.md`/`.markdown`), and full-screen presentations (`.ah-r`) navigated
 //! with the arrow keys.
 
-// Internal modules stay `pub(crate)`: the curated public surface is just
-// `run_cli`, called by the `src/main.rs` shim.
+// The public surface is just `run_cli`; everything else stays `pub(crate)`.
 pub(crate) mod cli;
-pub(crate) mod present;
-pub(crate) mod render;
+pub(crate) mod deck;
+pub(crate) mod markdown;
+pub(crate) mod mermaid;
 
-use anyhow::Result;
-use clap::Parser;
-
-use cli::Cli;
-
-/// Parse `argv`, read the input file argument, render it, and write the result
-/// to stdout.
-///
-/// This is the entire body of the `ahr` binary; it is public so the thin
-/// `src/main.rs` shim can call it.
-///
-/// # Errors
-/// Propagates any error from resolving/reading the input file or rendering it
-/// — unsupported extension, unreadable file, empty input, or malformed syntax.
-pub fn run_cli() -> Result<()> {
-    cli::dispatch(Cli::parse())
-}
+pub use cli::run_cli;
