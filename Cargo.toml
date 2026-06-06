@@ -68,6 +68,8 @@ figurehead = "0.4"
 termimad = "0.34"
 clap = { version = "4", features = ["derive"] }
 anyhow = "1"
+crossterm = "0.29"
+console = "0.16"
 
 [profile.release]
 opt-level = 3

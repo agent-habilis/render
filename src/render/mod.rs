@@ -29,10 +29,20 @@ pub(crate) fn mermaid(input: &str) -> Result<String> {
 /// unsupported diagram type) falls back to its original code-block rendering,
 /// so the function never loses content and stays infallible.
 pub(crate) fn markdown(input: &str) -> String {
+    markdown_to_width(input, wrap_width())
+}
+
+/// Render a Markdown document as styled terminal text wrapped to an explicit
+/// `width`, drawing any embedded ` ```mermaid ` blocks inline.
+///
+/// Same behaviour as [`markdown`], but the caller chooses the wrap column
+/// instead of inferring it from stdout. The presentation mode uses this to fit
+/// a slide's content into a centered column narrower than the terminal.
+pub(crate) fn markdown_to_width(input: &str, width: usize) -> String {
     let blocks = mermaid_blocks(input);
     if blocks.is_empty() {
         // Fast path: no embedded diagrams, render the whole document at once.
-        return termimad(input);
+        return termimad(input, width);
     }
 
     let mut out = String::new();
@@ -45,7 +55,7 @@ pub(crate) fn markdown(input: &str) -> String {
         // block-level boundary.
         let before = &input[cursor..start];
         if !before.trim().is_empty() {
-            out.push_str(&termimad(before));
+            out.push_str(&termimad(before, width));
         }
 
         match mermaid(src) {
@@ -56,7 +66,7 @@ pub(crate) fn markdown(input: &str) -> String {
             }
             // Can't draw it (unsupported type / bad syntax): keep the original
             // fenced block, rendered as a code block, so nothing is lost.
-            Err(_) => out.push_str(&termimad(&input[start..end])),
+            Err(_) => out.push_str(&termimad(&input[start..end], width)),
         }
 
         cursor = end;
@@ -64,17 +74,17 @@ pub(crate) fn markdown(input: &str) -> String {
 
     let after = &input[cursor..];
     if !after.trim().is_empty() {
-        out.push_str(&termimad(after));
+        out.push_str(&termimad(after, width));
     }
 
     out
 }
 
 /// Render markdown with [`termimad`]'s default skin — styled headings, lists,
-/// blockquotes, inline code, and balanced tables — wrapped to [`wrap_width`].
-fn termimad(input: &str) -> String {
+/// blockquotes, inline code, and balanced tables — wrapped to `width` columns.
+fn termimad(input: &str, width: usize) -> String {
     let skin = termimad::MadSkin::default();
-    skin.text(input, Some(wrap_width())).to_string()
+    skin.text(input, Some(width)).to_string()
 }
 
 /// Append newlines so `out` ends with a blank line (or is empty), giving a

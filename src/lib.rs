@@ -3,12 +3,14 @@
 //! This crate ships as **both** a binary (the `ahr` CLI) and a library. The
 //! binary is a thin shim over [`run_cli`]. It reads the input file given as
 //! its argument and selects a renderer from the extension: Mermaid diagrams via
-//! the [`figurehead`] crate (`.mmd`/`.mermaid`) and Markdown via
-//! [`termimad`] (`.md`/`.markdown`).
+//! the [`figurehead`] crate (`.mmd`/`.mermaid`), Markdown via [`termimad`]
+//! (`.md`/`.markdown`), and full-screen presentations (`.ahr-deck`) navigated
+//! with the arrow keys.
 
 // Internal modules stay `pub(crate)`: the curated public surface is just
 // `run_cli`, called by the `src/main.rs` shim.
 pub(crate) mod cli;
+pub(crate) mod present;
 pub(crate) mod render;
 
 use anyhow::Result;

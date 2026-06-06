@@ -1,0 +1,52 @@
+```deck
+title: ahr-deck demo
+author: agent-habilis
+```
+
+# ahr-deck
+
+A PowerPoint-style deck, in your terminal.
+
+Use the **arrow keys** to move between slides, `q` to quit.
+
+---
+
+## How it works
+
+- One file, slides separated by `---`
+- Each slide is plain **Markdown**
+- Content is centered, with a man-style footer below
+
+---
+
+```deck:slide
+title: Diagrams
+```
+
+## Mermaid, inline
+
+```mermaid
+flowchart LR
+    A[Write .ahr-deck] --> B[ahr deck.ahr-deck]
+    B --> C{Present}
+    C --> D[Arrow keys]
+    C --> E[q to quit]
+```
+
+---
+
+```deck:slide
+title: Overrides
+```
+
+## Per-slide titles
+
+This slide overrides the footer title via its own `deck:slide` block.
+
+Everything else falls back to the deck title.
+
+---
+
+# Thanks
+
+Made with `ahr` by agent-habilis.
