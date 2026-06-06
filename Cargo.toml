@@ -42,13 +42,15 @@ version = "0.1.0"
 edition.workspace = true
 rust-version.workspace = true
 authors = ["Caio Gondim <me@caiogondim.com>"]
-description = "render diagrams and other stdin inputs as terminal text"
+description = "render diagrams and documents as terminal text"
 license = "MIT"
 repository = "https://github.com/agent-habilis/render"
 homepage = "https://github.com/agent-habilis/render"
 readme = "README.md"
 keywords = ["mermaid", "diagram", "ascii", "terminal", "cli"]
 categories = ["command-line-utilities", "visualization"]
+# Release/CI scaffolding is not part of the crate payload.
+exclude = ["Formula/", ".github/"]
 
 [lints]
 workspace = true
@@ -73,3 +75,10 @@ lto = "fat"
 codegen-units = 1
 strip = true
 panic = "abort"
+
+[package.metadata.release]
+publish = false
+push = false
+tag-name = "v{{version}}"
+pre-release-commit-message = "chore: release v{{version}}"
+allow-branch = ["main"]

@@ -8,7 +8,9 @@ mod clean;
 mod fmt;
 mod install;
 mod lint;
+mod release;
 mod test;
+mod util;
 
 /// Task result; any `Err` is printed and turns into a non-zero exit.
 pub(crate) type TaskOutcome = Result<(), Box<dyn std::error::Error>>;
@@ -37,6 +39,13 @@ enum Task {
     Clean,
     /// Install the `ahr` binary.
     Install,
+    /// Build the release binary. With a level (`patch`|`minor`|`major`|
+    /// `x.y.z`, plus flags like `--execute`) drive cargo-release; dry run by
+    /// default.
+    Release {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -56,6 +65,7 @@ fn main() -> ExitCode {
         Task::Ci => ci::run(&sh),
         Task::Clean => clean::run(&sh),
         Task::Install => install::run(&sh),
+        Task::Release { args } => release::run(&sh, &args),
     };
 
     match outcome {
