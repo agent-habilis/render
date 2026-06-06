@@ -8,7 +8,8 @@ terminal text**, choosing the renderer from the file's extension:
   [`figurehead`](https://crates.io/crates/figurehead).
 - **Markdown** (`.md`, `.markdown`) as styled terminal text (headings, lists,
   blockquotes, inline code, balanced tables, width-wrapped), via
-  [`termimad`](https://crates.io/crates/termimad).
+  [`termimad`](https://crates.io/crates/termimad). Embedded ` ```mermaid `
+  blocks are drawn inline as diagrams.
 
 ## Usage
 

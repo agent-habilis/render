@@ -16,7 +16,7 @@ cargo run --quiet -- --path examples/sequence.mmd
 | `class.mmd`         | Mermaid class (braces form) |
 | `gitgraph.mmd`      | Mermaid git graph           |
 | `markdown.md`       | Markdown (styled via termimad) |
-| `markdown-with-mermaid.md` | Markdown embedding a ` ```mermaid ` block |
+| `markdown-with-mermaid.md` | Markdown with an embedded ` ```mermaid ` block (drawn inline) |
 
 > Note: figurehead parses class members in the brace-block form
 > (`class Foo { +bar() }`), not the `Foo : +bar()` colon form.

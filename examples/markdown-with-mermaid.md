@@ -1,8 +1,8 @@
 # Design Doc with an Embedded Diagram
 
 Markdown often embeds Mermaid diagrams in a fenced ` ```mermaid ` block.
-This file is **Markdown**, so `ahr` renders it with termimad — the diagram
-below is shown as a fenced code block (its Mermaid source), not drawn.
+This file is **Markdown**, so `ahr` renders the prose with termimad and
+**draws the diagram below inline** with figurehead.
 
 ## Request flow
 
@@ -17,9 +17,9 @@ graph LR
 
 ## Notes
 
-- The prose, headings, and list render styled.
-- To *draw* the diagram instead, feed the Mermaid block to `ahr` on its own
-  (`ahr --format mermaid`), or pipe just the fenced block's contents.
+- The prose, headings, and list render styled by termimad.
+- The ` ```mermaid ` block above is drawn as a diagram by figurehead, spliced
+  in where its source sits.
 
-> Rendering embedded ` ```mermaid ` blocks as drawn diagrams inline would be
-> a future feature; today the two formats are rendered separately.
+> A ` ```mermaid ` block of a diagram type figurehead can't draw falls back to
+> its plain code-block rendering, so nothing is ever lost.
