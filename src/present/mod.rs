@@ -30,7 +30,7 @@ use ansi_to_tui::IntoText;
 use tui_term::widget::PseudoTerminal;
 
 use crate::render;
-use parse::{CodeBlock, Deck, Segment};
+use parse::{AnimationBlock, CodeBlock, Deck, Segment};
 use tty::{ManagedProc, ProcessManager};
 
 /// Horizontal margin (each side) kept clear of slide content.
@@ -78,20 +78,33 @@ struct App {
     manager: ProcessManager,
     current: usize,
     start: Instant,
+    /// When the current slide became active — the clock for `<animation>`s
+    /// (reset on every navigation, so a flipbook restarts when its slide opens).
+    slide_started: Instant,
     static_render: StaticRender,
 }
 
-/// Memoized renders of the static segments (Markdown / Mermaid / Code) for the
-/// current slide. These depend only on the segment source and the wrap width, so
-/// they are reused across the (up to ~10 Hz) repaints a running process
+/// Memoized renders of the time-independent segments for the current slide.
+/// These depend only on the segment source and the wrap width, so they are
+/// reused across the (up to ~10 Hz) repaints a running process or animation
 /// triggers, rather than re-running termimad/figurehead/syntect every frame.
 #[derive(Debug, Default)]
 struct StaticRender {
     /// The `(slide, content_w)` the cache is valid for.
     key: Option<(usize, usize)>,
-    /// By block index: the rendered `(text, width, height)`, or `None` for the
-    /// live `Tty` segments (whose layout is recomputed each frame).
-    items: Vec<Option<(Text<'static>, u16, u16)>>,
+    /// One entry per segment, by block index.
+    items: Vec<Cached>,
+}
+
+/// A segment's cached render in [`StaticRender`].
+#[derive(Debug)]
+enum Cached {
+    /// A live `<tty>` — laid out fresh each frame, nothing cached.
+    Live,
+    /// A static text render `(text, width, height)` (Markdown / Mermaid / Code).
+    Static(Text<'static>, u16, u16),
+    /// An `<animation>`'s frames, each pre-rendered `(text, width, height)`.
+    Frames(Vec<(Text<'static>, u16, u16)>),
 }
 
 impl App {
@@ -101,6 +114,7 @@ impl App {
             manager: ProcessManager::new(),
             current: 0,
             start: Instant::now(),
+            slide_started: Instant::now(),
             static_render: StaticRender::default(),
         }
     }
@@ -140,6 +154,7 @@ impl App {
             if reconciled_for != self.current {
                 self.manager.reconcile(self.current, &segments);
                 reconciled_for = self.current;
+                self.slide_started = Instant::now(); // restart animation clocks
                 drawn = None;
             }
 
@@ -154,8 +169,11 @@ impl App {
                 .ensure(self.current, &segments, content_rows, content_cols);
             self.refresh_static_render(&segments, content_w);
 
-            let running = self.manager.any_running(self.current, &segments);
-            if drawn != Some((self.current, cols, rows)) || running {
+            // Repaint when a process is streaming or an animation is still
+            // moving, in addition to slide/size changes.
+            let active = self.manager.any_running(self.current, &segments)
+                || self.any_animating(&segments);
+            if drawn != Some((self.current, cols, rows)) || active {
                 let blink_on = (self.start.elapsed().as_millis() / BLINK_MS).is_multiple_of(2);
                 terminal.draw(|frame| self.draw(frame, &segments, blink_on))?;
                 drawn = Some((self.current, cols, rows));
@@ -191,16 +209,56 @@ impl App {
         let items = segments
             .iter()
             .map(|segment| match segment {
-                Segment::Markdown(src) => Some(markdown_item(src, content_w)),
-                Segment::Mermaid(src) => Some(mermaid_item(src)),
-                Segment::Code(block) => Some(code_item(block)),
-                Segment::Tty(_) => None,
+                Segment::Markdown(src) => {
+                    let (text, width, height) = markdown_item(src, content_w);
+                    Cached::Static(text, width, height)
+                }
+                Segment::Mermaid(src) => {
+                    let (text, width, height) = mermaid_item(src);
+                    Cached::Static(text, width, height)
+                }
+                Segment::Code(block) => {
+                    let (text, width, height) = code_item(block);
+                    Cached::Static(text, width, height)
+                }
+                Segment::Animation(block) => Cached::Frames(
+                    block.frames.iter().map(|frame| frame_item(frame)).collect(),
+                ),
+                Segment::Tty(_) => Cached::Live,
             })
             .collect();
         self.static_render = StaticRender {
             key: Some(key),
             items,
         };
+    }
+
+    /// The active frame index for `block`, from the per-slide clock.
+    fn frame_index(&self, block: &AnimationBlock) -> usize {
+        let count = block.frames.len();
+        if count <= 1 {
+            return 0;
+        }
+        let elapsed_ms = self.slide_started.elapsed().as_millis();
+        let raw = (elapsed_ms / u128::from(block.frame_ms.max(1))) as usize;
+        if block.looping {
+            raw % count
+        } else {
+            raw.min(count - 1)
+        }
+    }
+
+    /// Whether any `<animation>` on the slide is still moving (so the loop keeps
+    /// repainting): a looping multi-frame animation always is; a one-shot one
+    /// only until it reaches its last frame.
+    fn any_animating(&self, segments: &[Segment]) -> bool {
+        segments.iter().any(|segment| match segment {
+            Segment::Animation(block) => {
+                block.frames.len() > 1
+                    && (block.looping || self.frame_index(block) + 1 < block.frames.len())
+            }
+            Segment::Markdown(_) | Segment::Tty(_) | Segment::Code(_) | Segment::Mermaid(_) => false,
+        })
     }
 
     /// Draw the current slide: a vertically-centered stack of its segments, with
@@ -256,11 +314,11 @@ impl App {
         let mut items = Vec::new();
         for (block_index, segment) in segments.iter().enumerate() {
             match segment {
-                // Static segments (Markdown, Mermaid, and now syntax-highlighted
+                // Static segments (Markdown, Mermaid, and syntax-highlighted
                 // Code) are rendered once into `static_render` (keyed by slide +
                 // width) and reused across repaints.
                 Segment::Markdown(_) | Segment::Mermaid(_) | Segment::Code(_) => {
-                    if let Some(Some((text, width, height))) =
+                    if let Some(Cached::Static(text, width, height)) =
                         self.static_render.items.get(block_index)
                         && *height > 0
                     {
@@ -272,6 +330,23 @@ impl App {
                             left_align: matches!(segment, Segment::Markdown(_) | Segment::Code(_)),
                             kind: ItemKind::Markdown(text.clone()),
                         });
+                    }
+                }
+                // The active frame is picked from the cached frames by the
+                // per-slide clock; the frames themselves are rendered once.
+                Segment::Animation(block) => {
+                    if let Some(Cached::Frames(frames)) = self.static_render.items.get(block_index)
+                        && !frames.is_empty()
+                    {
+                        let (text, width, height) = &frames[self.frame_index(block)];
+                        if *height > 0 {
+                            items.push(Item {
+                                width: (*width).min(content.width),
+                                height: *height,
+                                left_align: false, // ASCII art: centered as a block
+                                kind: ItemKind::Markdown(text.clone()),
+                            });
+                        }
                     }
                 }
                 Segment::Tty(block) => {
@@ -391,6 +466,21 @@ fn mermaid_item(src: &str) -> (Text<'static>, u16, u16) {
     block_text(&rendered)
 }
 
+/// An `<animation>` `<frame>` rendered **verbatim** (preformatted; every space
+/// kept) to a `ratatui` [`Text`] with its measured size. Unlike [`block_text`],
+/// surrounding blank lines are **not** trimmed, so a frame keeps its exact
+/// height — the figure stays put across the flip instead of jumping.
+fn frame_item(frame: &str) -> (Text<'static>, u16, u16) {
+    let width = frame.lines().map(console::measure_text_width).max().unwrap_or(0);
+    let height = frame.lines().count().max(1);
+    let text = frame.into_text().unwrap_or_else(|_| Text::raw(frame.to_owned()));
+    (
+        text,
+        u16::try_from(width).unwrap_or(u16::MAX),
+        u16::try_from(height).unwrap_or(u16::MAX),
+    )
+}
+
 /// Convert a rendered (ANSI) block to a `ratatui` [`Text`], returning it with its
 /// measured display width and line count (surrounding blank lines trimmed so
 /// vertical centering is not skewed).
@@ -473,8 +563,8 @@ fn action_for(key: &KeyEvent) -> Option<Action> {
 
 #[cfg(test)]
 mod tests {
-    use super::App;
-    use super::parse::parse_deck;
+    use super::parse::{Segment, parse_deck};
+    use super::{App, Cached};
 
     #[test]
     fn static_render_caches_static_segments_not_processes() {
@@ -489,8 +579,18 @@ mod tests {
         assert_eq!(app.static_render.key, Some((0, 80)));
         assert_eq!(app.static_render.items.len(), segments.len());
         // Markdown + Mermaid are cached; the live <tty> is not.
-        let cached = app.static_render.items.iter().filter(|item| item.is_some()).count();
-        let live = app.static_render.items.iter().filter(|item| item.is_none()).count();
+        let cached = app
+            .static_render
+            .items
+            .iter()
+            .filter(|item| !matches!(item, Cached::Live))
+            .count();
+        let live = app
+            .static_render
+            .items
+            .iter()
+            .filter(|item| matches!(item, Cached::Live))
+            .count();
         assert_eq!(cached, 2);
         assert_eq!(live, 1);
 
@@ -513,6 +613,40 @@ mod tests {
 
         app.refresh_static_render(&segments, 80);
         assert_eq!(app.static_render.items.len(), 1);
-        assert!(app.static_render.items[0].is_some(), "code must be cached");
+        assert!(
+            matches!(app.static_render.items[0], Cached::Static(..)),
+            "code must be cached"
+        );
+    }
+
+    #[test]
+    fn animation_caches_frames_and_advances_on_the_clock() {
+        let deck = parse_deck(
+            "<animation seconds=\"0.2\">\n<frame>\nA\n</frame>\n<frame>\nB\n</frame>\n<frame>\nC\n</frame>\n</animation>",
+        );
+        let segments = deck.slides[0].segments();
+        let mut app = App::new(deck);
+        app.refresh_static_render(&segments, 80);
+
+        // The animation caches its frames (one Frames entry, three frames).
+        match &app.static_render.items[0] {
+            Cached::Frames(frames) => assert_eq!(frames.len(), 3),
+            Cached::Live | Cached::Static(..) => panic!("animation must cache frames"),
+        }
+
+        let Segment::Animation(block) = &segments[0] else {
+            panic!("expected animation");
+        };
+        // Frame index advances with elapsed time and (here, non-looping) holds
+        // the last frame; `any_animating` stays true until that last frame.
+        let now = std::time::Instant::now();
+        app.slide_started = now;
+        assert_eq!(app.frame_index(block), 0);
+        assert!(app.any_animating(&segments));
+        app.slide_started = now.checked_sub(std::time::Duration::from_millis(250)).unwrap();
+        assert_eq!(app.frame_index(block), 1);
+        app.slide_started = now.checked_sub(std::time::Duration::from_secs(10)).unwrap();
+        assert_eq!(app.frame_index(block), 2); // held at last (no loop)
+        assert!(!app.any_animating(&segments)); // settled
     }
 }

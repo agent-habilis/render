@@ -1,0 +1,85 @@
+```deck
+title: ah-r animation
+```
+
+# Animation
+
+Frame-by-frame `<animation>` — a flipbook of literal `<frame>`s, advancing
+every `seconds`, optionally `loop`ing.
+
+---
+
+```deck:slide
+title: Spinner
+```
+
+## A looping spinner
+
+<animation seconds="0.12" loop>
+<frame>
+   |
+</frame>
+<frame>
+   /
+</frame>
+<frame>
+   -
+</frame>
+<frame>
+   \
+</frame>
+</animation>
+
+`seconds="0.12" loop` — spins in place forever.
+
+---
+
+```deck:slide
+title: Cat
+```
+
+## Same width, blinks in place
+
+<animation seconds="0.4" loop>
+<frame>
+ /\_/\
+( o.o )
+ > ^ <
+</frame>
+<frame>
+ /\_/\
+( -.- )
+ > ^ <
+</frame>
+</animation>
+
+---
+
+```deck:slide
+title: Countdown
+```
+
+## Plays once, holds the last frame
+
+<animation seconds="0.7">
+<frame>
+3
+</frame>
+<frame>
+2
+</frame>
+<frame>
+1
+</frame>
+<frame>
+go!
+</frame>
+</animation>
+
+No `loop` — it counts down once and stays on `go!`.
+
+---
+
+# Thanks
+
+Made with `ahr` by agent-habilis.

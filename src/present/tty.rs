@@ -420,7 +420,9 @@ impl ProcessManager {
             Segment::Tty(block) => self
                 .proc_for(current, block_index, block)
                 .is_some_and(ManagedProc::is_running),
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) => false,
+            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
+                false
+            }
         })
     }
 }
@@ -458,7 +460,9 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
         .iter()
         .filter_map(|segment| match segment {
             Segment::Tty(block) => persistent_id(block).map(str::to_owned),
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) => None,
+            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
+                None
+            }
         })
         .collect()
 }

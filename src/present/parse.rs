@@ -62,6 +62,19 @@ pub(crate) enum Segment {
     Code(CodeBlock),
     /// A `<mermaid>` element: its source, drawn as a diagram.
     Mermaid(String),
+    /// An `<animation>` element: literal `<frame>`s flipped on a timer.
+    Animation(AnimationBlock),
+}
+
+/// An `<animation>` element: a flipbook of literal `<frame>`s.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct AnimationBlock {
+    /// Milliseconds each frame is shown (from the `seconds` attribute).
+    pub(crate) frame_ms: u32,
+    /// `loop` — wrap back to the first frame forever; else hold the last.
+    pub(crate) looping: bool,
+    /// The frames, in order; each is verbatim preformatted text.
+    pub(crate) frames: Vec<String>,
 }
 
 /// A `<code>` element: its `lang` and the code body.
@@ -120,6 +133,7 @@ enum Element {
     Code,
     Tty,
     Mermaid,
+    Animation,
 }
 
 impl Element {
@@ -128,6 +142,7 @@ impl Element {
             "code" => Some(Self::Code),
             "tty" => Some(Self::Tty),
             "mermaid" => Some(Self::Mermaid),
+            "animation" => Some(Self::Animation),
             _ => None,
         }
     }
@@ -137,6 +152,7 @@ impl Element {
             Self::Code => "</code>",
             Self::Tty => "</tty>",
             Self::Mermaid => "</mermaid>",
+            Self::Animation => "</animation>",
         }
     }
 }
@@ -189,6 +205,7 @@ fn split_segments(body: &str) -> Vec<Segment> {
                     Element::Code => Segment::Code(parse_code_attrs(attrs, content)),
                     Element::Tty => Segment::Tty(parse_tty_attrs(attrs, content)),
                     Element::Mermaid => Segment::Mermaid(content),
+                    Element::Animation => Segment::Animation(parse_animation(attrs, &content)),
                 });
                 pos = close + 1;
                 continue;
@@ -238,6 +255,68 @@ fn parse_code_attrs(attrs: &str, code: String) -> CodeBlock {
         .and_then(|(_, value)| value)
         .unwrap_or_default();
     CodeBlock { lang, code }
+}
+
+/// Default per-frame duration when `seconds` is absent or unparseable.
+const ANIMATION_DEFAULT_MS: u32 = 1000;
+/// Floor (ms) on per-frame duration, so a tiny/zero `seconds` can't
+/// divide-by-zero or spin the render loop; and the ceiling (1 hour).
+const ANIMATION_MIN_MS: f32 = 50.0;
+const ANIMATION_MAX_MS: f32 = 3_600_000.0;
+
+/// Parse an `<animation>` element's attributes (`seconds`, `loop`) and split its
+/// body into `<frame>` children (each taken verbatim).
+#[expect(
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    reason = "seconds*1000 is checked finite and clamped into [50, 3_600_000] before the cast"
+)]
+fn parse_animation(attrs: &str, content: &str) -> AnimationBlock {
+    let mut frame_ms = ANIMATION_DEFAULT_MS;
+    let mut looping = false;
+    for (key, value) in tokenize_attrs(attrs) {
+        match key.as_str() {
+            "seconds" => {
+                if let Some(secs) = value.as_deref().and_then(|val| val.parse::<f32>().ok())
+                    && secs.is_finite()
+                {
+                    frame_ms = (secs * 1000.0).clamp(ANIMATION_MIN_MS, ANIMATION_MAX_MS) as u32;
+                }
+            }
+            "loop" => looping = value.as_deref() != Some("false"),
+            _ => {}
+        }
+    }
+    AnimationBlock {
+        frame_ms,
+        looping,
+        frames: parse_frames(content),
+    }
+}
+
+/// Split an `<animation>` body into its `<frame>` … `</frame>` children, each
+/// captured verbatim. Lines outside a frame (blank lines, indentation) are
+/// ignored. An unterminated `<frame>` ends the scan.
+fn parse_frames(content: &str) -> Vec<String> {
+    let lines: Vec<&str> = content.lines().collect();
+    let mut frames = Vec::new();
+    let mut pos = 0;
+    while pos < lines.len() {
+        if lines[pos].trim() == "<frame>" {
+            let mut close = pos + 1;
+            while close < lines.len() && lines[close].trim() != "</frame>" {
+                close += 1;
+            }
+            if close >= lines.len() {
+                break; // unterminated frame
+            }
+            frames.push(lines[pos + 1..close].join("\n"));
+            pos = close + 1;
+        } else {
+            pos += 1;
+        }
+    }
+    frames
 }
 
 /// Parse a `<tty>` element's attributes into a [`TtyBlock`]. Attributes are
@@ -503,7 +582,7 @@ mod tests {
     fn tty(segment: &Segment) -> &super::TtyBlock {
         match segment {
             Segment::Tty(block) => block,
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) => {
+            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
                 panic!("expected a tty segment")
             }
         }
@@ -512,8 +591,17 @@ mod tests {
     fn code(segment: &Segment) -> &super::CodeBlock {
         match segment {
             Segment::Code(block) => block,
-            Segment::Markdown(_) | Segment::Tty(_) | Segment::Mermaid(_) => {
+            Segment::Markdown(_) | Segment::Tty(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
                 panic!("expected a code segment")
+            }
+        }
+    }
+
+    fn animation(segment: &Segment) -> &super::AnimationBlock {
+        match segment {
+            Segment::Animation(block) => block,
+            Segment::Markdown(_) | Segment::Tty(_) | Segment::Code(_) | Segment::Mermaid(_) => {
+                panic!("expected an animation segment")
             }
         }
     }
@@ -614,6 +702,40 @@ mod tests {
     #[test]
     fn looks_like_element_but_longer_name_is_markdown() {
         let body = "<codex>\nx\n</codex>";
+        assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
+    }
+
+    #[test]
+    fn animation_parses_frames_seconds_and_loop() {
+        let body = "<animation seconds=\"0.5\" loop>\n<frame>\nA\n</frame>\n<frame>\nB\nB2\n</frame>\n</animation>";
+        let block = animation(&split_segments(body)[0]).clone();
+        assert_eq!(block.frame_ms, 500);
+        assert!(block.looping);
+        assert_eq!(block.frames, vec!["A".to_owned(), "B\nB2".to_owned()]);
+    }
+
+    #[test]
+    fn animation_defaults_and_preserves_frame_indentation() {
+        // No seconds/loop -> 1s, not looping; frame text is verbatim (spaces kept).
+        let body = "<animation>\n<frame>\n  ___\n / o \\\n</frame>\n</animation>";
+        let block = animation(&split_segments(body)[0]).clone();
+        assert_eq!(block.frame_ms, 1000);
+        assert!(!block.looping);
+        assert_eq!(block.frames, vec!["  ___\n / o \\".to_owned()]);
+    }
+
+    #[test]
+    fn separator_inside_a_frame_is_not_a_split() {
+        // A `---` inside an `<animation>` frame is content, not a slide separator.
+        let deck = parse_deck("<animation>\n<frame>\n---\n</frame>\n</animation>\n\n---\n\n# Next");
+        assert_eq!(deck.slides.len(), 2);
+        assert_eq!(animation(&deck.slides[0].segments()[0]).frames, vec!["---".to_owned()]);
+        assert_eq!(deck.slides[1].body, "# Next");
+    }
+
+    #[test]
+    fn unterminated_animation_stays_markdown() {
+        let body = "<animation>\n<frame>\nA\n</frame>";
         assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
     }
 
