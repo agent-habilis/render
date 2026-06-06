@@ -1,6 +1,6 @@
 //! The `ahr` command-line interface: the clap-derived argument shape and
-//! the [`dispatch`] entry point. `ahr` reads the file given by `--path` and
-//! writes text to stdout; the file's extension selects the renderer.
+//! the [`dispatch`] entry point. `ahr` reads the file given as its positional
+//! argument and writes text to stdout; the file's extension selects the renderer.
 
 use std::io::Write;
 use std::path::PathBuf;
@@ -16,12 +16,11 @@ use crate::render;
     name = "ahr",
     about = "render diagrams and documents as terminal text",
     version,
-    after_help = "the file extension selects the renderer — e.g. `ahr --path diagram.mmd`"
+    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`"
 )]
 pub(crate) struct Cli {
     /// Path to the input file. The extension selects the renderer:
     /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown.
-    #[arg(long)]
     path: PathBuf,
 }
 
@@ -49,8 +48,8 @@ fn format_for_extension(path: &std::path::Path) -> Option<Format> {
     }
 }
 
-/// Read the `--path` file, render it per its extension, and write the result
-/// to stdout.
+/// Read the input file (the positional argument), render it per its extension,
+/// and write the result to stdout.
 ///
 /// # Errors
 /// An unsupported/missing extension, a file that can't be read (not found,

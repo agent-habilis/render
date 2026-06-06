@@ -3,9 +3,9 @@
 Sample inputs for `ahr`. Each is a standalone file you can pass to the binary:
 
 ```sh
-ahr --path examples/flowchart-td.mmd
+ahr examples/flowchart-td.mmd
 # during development:
-cargo run --quiet -- --path examples/sequence.mmd
+cargo run --quiet -- examples/sequence.mmd
 ```
 
 | File                | Kind / diagram type         |

@@ -14,15 +14,15 @@ terminal text**, choosing the renderer from the file's extension:
 ## Usage
 
 ```sh
-ahr --path diagram.mmd
-ahr --path notes.md
+ahr diagram.mmd
+ahr notes.md
 ```
 
 The extension picks the renderer; an unsupported extension is an error. Output
 is written to stdout, so it pipes cleanly:
 
 ```sh
-ahr --path notes.md | less -R
+ahr notes.md | less -R
 ```
 
 ### Examples
@@ -30,8 +30,8 @@ ahr --path notes.md | less -R
 Sample inputs live in [`examples/`](examples/):
 
 ```sh
-ahr --path examples/flowchart-td.mmd
-ahr --path examples/sequence.mmd
+ahr examples/flowchart-td.mmd
+ahr examples/sequence.mmd
 ```
 
 ## Build

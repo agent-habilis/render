@@ -1,8 +1,8 @@
 //! `agent-habilis-render` — render an input file as terminal text.
 //!
 //! This crate ships as **both** a binary (the `ahr` CLI) and a library. The
-//! binary is a thin shim over [`run_cli`]. It reads the file given by
-//! `--path` and selects a renderer from the extension: Mermaid diagrams via
+//! binary is a thin shim over [`run_cli`]. It reads the input file given as
+//! its argument and selects a renderer from the extension: Mermaid diagrams via
 //! the [`figurehead`] crate (`.mmd`/`.mermaid`) and Markdown via
 //! [`termimad`] (`.md`/`.markdown`).
 
@@ -16,8 +16,8 @@ use clap::Parser;
 
 use cli::Cli;
 
-/// Parse `argv`, read the `--path` file, render it, and write the result to
-/// stdout.
+/// Parse `argv`, read the input file argument, render it, and write the result
+/// to stdout.
 ///
 /// This is the entire body of the `ahr` binary; it is public so the thin
 /// `src/main.rs` shim can call it.
