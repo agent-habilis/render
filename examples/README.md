@@ -1,12 +1,11 @@
 # examples
 
-Sample inputs for `ahr`. Each is a standalone file you can pipe into the
-binary:
+Sample inputs for `ahr`. Each is a standalone file you can pass to the binary:
 
 ```sh
-ahr < examples/flowchart-td.mmd
+ahr --path examples/flowchart-td.mmd
 # during development:
-cargo run --quiet -- < examples/sequence.mmd
+cargo run --quiet -- --path examples/sequence.mmd
 ```
 
 | File                | Kind / diagram type         |

@@ -1,153 +1,82 @@
 //! The `ahr` command-line interface: the clap-derived argument shape and
-//! the [`dispatch`] entry point. `ahr` always reads its input from stdin and
-//! writes text to stdout; the optional `--format` flag forces how that input
-//! is interpreted (default: auto-detect).
+//! the [`dispatch`] entry point. `ahr` reads the file given by `--path` and
+//! writes text to stdout; the file's extension selects the renderer.
 
-use std::io::{Read, Write};
+use std::io::Write;
+use std::path::PathBuf;
 
-use anyhow::{Result, bail};
-use clap::{Parser, ValueEnum};
+use anyhow::{Context, Result, bail};
+use clap::Parser;
 
 use crate::render;
 
-/// Render diagrams (and, later, other inputs) from stdin as terminal text.
-#[derive(Parser, Debug, Clone, Copy)]
+/// Render a diagram or document file as terminal text.
+#[derive(Parser, Debug)]
 #[command(
     name = "ahr",
-    about = "render diagrams and other stdin inputs as terminal text",
+    about = "render diagrams and documents as terminal text",
     version,
-    after_help = "reads stdin, writes text to stdout — e.g. `ahr < diagram.mmd`"
+    after_help = "the file extension selects the renderer — e.g. `ahr --path diagram.mmd`"
 )]
 pub(crate) struct Cli {
-    /// How to interpret the input. `auto` (default) sniffs the input: a
-    /// leading Mermaid diagram keyword is rendered as a diagram, anything
-    /// else as Markdown.
-    #[arg(long, value_enum, default_value_t = Format::Auto)]
-    format: Format,
+    /// Path to the input file. The extension selects the renderer:
+    /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown.
+    #[arg(long)]
+    path: PathBuf,
 }
 
-/// The supported input formats. `Auto` sniffs the input and resolves to
-/// one of the concrete formats (see [`looks_like_mermaid`]).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
-pub(crate) enum Format {
-    /// Detect the format from the input.
-    Auto,
+/// Which renderer to drive, resolved from the input file's extension.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Format {
     /// A Mermaid diagram (flowchart, sequence, class, gitgraph, ...).
     Mermaid,
     /// A Markdown document, rendered as styled terminal text.
     Markdown,
 }
 
-/// Distinctive (camelCase / compound) Mermaid keywords that are very unlikely
-/// to start a line of ordinary prose, so a leading match alone is conclusive.
-const DISTINCTIVE_KEYWORDS: &[&str] = &[
-    "sequenceDiagram",
-    "classDiagram",
-    "stateDiagram",
-    "stateDiagram-v2",
-    "erDiagram",
-    "gitGraph",
-    "mindmap",
-    "quadrantChart",
-    "requirementDiagram",
-];
-
-/// Mermaid keywords that collide with common English words (`pie charts`,
-/// `graph traversal`, ...). They only count as a diagram header when the line
-/// is the keyword alone or a recognised sub-directive — never a prose
-/// sentence. `graph`/`flowchart` are handled separately (they need a
-/// direction).
-const AMBIGUOUS_KEYWORDS: &[&str] = &["pie", "gantt", "journey", "timeline"];
-
-/// Flowchart directions that must follow `graph` / `flowchart` for the line
-/// to be a diagram header rather than prose (`graph TD`, `flowchart LR`).
-const FLOWCHART_DIRECTIONS: &[&str] = &["TB", "TD", "BT", "RL", "LR"];
-
-/// The first line that could be a Mermaid diagram header, skipping a leading
-/// YAML frontmatter block (`--- … ---`) and any `%%` init directives /
-/// comments that legally precede the diagram keyword.
-fn mermaid_header_line(input: &str) -> Option<&str> {
-    let mut lines = input.lines().map(str::trim).filter(|line| !line.is_empty());
-    let mut line = lines.next()?;
-    if line == "---" {
-        // Consume to the closing fence, then take the next content line.
-        for inner in lines.by_ref() {
-            if inner == "---" {
-                break;
-            }
-        }
-        line = lines.next()?;
+/// Resolve the renderer from a file extension, case-insensitively. Returns
+/// `None` for an unsupported or missing extension.
+fn format_for_extension(path: &std::path::Path) -> Option<Format> {
+    match path
+        .extension()
+        .and_then(|ext| ext.to_str())
+        .map(str::to_ascii_lowercase)
+        .as_deref()
+    {
+        Some("mmd" | "mermaid") => Some(Format::Mermaid),
+        Some("md" | "markdown") => Some(Format::Markdown),
+        _ => None,
     }
-    while line.starts_with("%%") {
-        line = lines.next()?;
-    }
-    Some(line)
 }
 
-/// Whether `input` looks like a Mermaid diagram. Uses a precision-biased
-/// heuristic: misclassifying prose as a diagram makes rendering *fail*
-/// (figurehead errors on non-diagram text), whereas the reverse just renders
-/// a diagram's source as Markdown — so we only claim Mermaid when the header
-/// line is unmistakably a diagram declaration. `--format` overrides either way.
-fn looks_like_mermaid(input: &str) -> bool {
-    let Some(line) = mermaid_header_line(input) else {
-        return false;
-    };
-    let mut tokens = line.split_whitespace();
-    let Some(first) = tokens.next() else {
-        return false;
-    };
-    let second = tokens.next();
-
-    if DISTINCTIVE_KEYWORDS.contains(&first) {
-        return true;
-    }
-    if first == "graph" || first == "flowchart" {
-        return second
-            .map(|dir| dir.trim_end_matches(';'))
-            .is_some_and(|dir| FLOWCHART_DIRECTIONS.contains(&dir));
-    }
-    if AMBIGUOUS_KEYWORDS.contains(&first) {
-        // Stand-alone (`pie`) or a header sub-directive (`pie title …`,
-        // `pie showData`); a prose sentence has some other second word.
-        return matches!(second, None | Some("title" | "showData"));
-    }
-    false
-}
-
-/// Read all of stdin, render it per `--format`, and write the result to
-/// stdout.
+/// Read the `--path` file, render it per its extension, and write the result
+/// to stdout.
 ///
 /// # Errors
-/// Empty input, an I/O failure reading stdin or writing stdout, or a
-/// rendering error from the selected format.
+/// An unsupported/missing extension, a file that can't be read (not found,
+/// permission, non-UTF-8), empty contents, or a rendering error.
 pub(crate) fn dispatch(cli: Cli) -> Result<()> {
-    let mut input = String::new();
-    std::io::stdin()
-        .read_to_string(&mut input)
-        .map_err(|err| anyhow::anyhow!("failed to read stdin: {err}"))?;
+    let Cli { path } = cli;
+
+    // Resolve the renderer from the extension first, before reading.
+    let Some(format) = format_for_extension(&path) else {
+        bail!(
+            "unsupported input file `{}`: expected a .mmd/.mermaid or .md/.markdown extension",
+            path.display()
+        );
+    };
+
+    let input = std::fs::read_to_string(&path)
+        .with_context(|| format!("failed to read `{}`", path.display()))?;
 
     if input.trim().is_empty() {
-        bail!("no input on stdin");
+        bail!("`{}` is empty", path.display());
     }
-
-    // Resolve `auto` to a concrete format up front so the render match has
-    // no `Auto` arm to fall through.
-    let format = if cli.format == Format::Auto {
-        if looks_like_mermaid(&input) {
-            Format::Mermaid
-        } else {
-            Format::Markdown
-        }
-    } else {
-        cli.format
-    };
 
     // Arms kept explicit (no `_ =>`) so a new variant is a compile error.
     let rendered = match format {
         Format::Mermaid => render::mermaid(&input)?,
         Format::Markdown => render::markdown(&input),
-        Format::Auto => unreachable!("Auto resolved to a concrete format above"),
     };
 
     let mut stdout = std::io::stdout();

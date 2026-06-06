@@ -1,6 +1,6 @@
-//! Input renderers. Each function turns a raw stdin string into the text
-//! that `ahr` prints: [`mermaid`] draws diagrams, [`markdown`] styles
-//! Markdown for the terminal.
+//! Input renderers. Each function turns an input string into the text that
+//! `ahr` prints: [`mermaid`] draws diagrams, [`markdown`] styles Markdown for
+//! the terminal.
 
 use std::io::IsTerminal;
 
