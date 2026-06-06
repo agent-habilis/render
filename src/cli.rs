@@ -16,7 +16,10 @@ use crate::render;
     name = "ahr",
     about = "render diagrams and documents as terminal text",
     version,
-    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`"
+    // No file argument (e.g. a bare `ahr`) prints the help screen instead of a
+    // terse missing-argument error.
+    arg_required_else_help = true,
+    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`\n\na tool by agent-habilis █🫈"
 )]
 pub(crate) struct Cli {
     /// Path to the input file. The extension selects the renderer:
