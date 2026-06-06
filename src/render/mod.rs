@@ -80,6 +80,14 @@ pub(crate) fn markdown_to_width(input: &str, width: usize) -> String {
     out
 }
 
+/// Render Markdown as styled terminal text wrapped to `width`, **without** the
+/// embedded-diagram handling of [`markdown_to_width`]. Decks use this so a
+/// ` ```mermaid ` fence is just a styled code block (diagrams come from the
+/// `<mermaid>` element instead).
+pub(crate) fn markdown_plain(input: &str, width: usize) -> String {
+    termimad(input, width)
+}
+
 /// Render markdown with [`termimad`]'s default skin — styled headings, lists,
 /// blockquotes, inline code, and balanced tables — wrapped to `width` columns.
 fn termimad(input: &str, width: usize) -> String {

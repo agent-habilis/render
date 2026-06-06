@@ -1,18 +1,24 @@
 //! Parse an `.ahr-deck` file into a [`Deck`] of [`Slide`]s.
 //!
-//! The format is Markdown split into slides on standalone `---` lines — `---`
-//! is *only* a slide separator. Metadata lives in fenced code blocks at the
-//! start of a slide:
+//! A deck is a **Markdown file with embedded XML islands**. It is split into
+//! slides on standalone `---` lines (`---` is *only* a slide separator), and
+//! deck/slide metadata lives in fenced code blocks at the start of a slide:
 //!
 //! - ```` ```deck ```` — deck-level frontmatter (`title`), usually at the top of
 //!   the file.
 //! - ```` ```deck:slide ```` — per-slide frontmatter; its `title` overrides the
 //!   deck title in that slide's footer.
 //!
-//! Each block holds `key: value` lines and is stripped from the rendered body.
-//! Splitting is fence-aware, so a `---` inside a fenced code block in slide
-//! content is content, not a separator. The scanner is hand-rolled in the same
-//! line-by-line style as `render::mermaid_blocks`.
+//! Everything else is ordinary Markdown, except three embedded XML elements that
+//! express things Markdown cannot — see [`Segment`]:
+//!
+//! - `<code lang="…" render="…">…</code>` — syntax-highlighted code.
+//! - `<tty …>…</tty>` — a live command in a pseudo-terminal.
+//! - `<mermaid>…</mermaid>` — a drawn diagram.
+//!
+//! Plain ` ``` ` fences are just Markdown code blocks. Splitting is fence- and
+//! element-aware, so a `---` inside a fence or an element is content, not a
+//! separator. The scanners are hand-rolled in the same line-by-line style.
 
 /// A parsed presentation: deck-level metadata plus the ordered slides.
 #[derive(Debug, Default)]
@@ -37,8 +43,8 @@ impl Slide {
     }
 
     /// Split the slide body into ordered segments: runs of Markdown interleaved
-    /// with ` ```tty ` execution blocks. A slide with no `tty` block yields a
-    /// single [`Segment::Markdown`] holding the whole body.
+    /// with the embedded `<code>` / `<tty>` / `<mermaid>` elements. A slide with
+    /// no element yields a single [`Segment::Markdown`] holding the whole body.
     pub(crate) fn segments(&self) -> Vec<Segment> {
         split_segments(&self.body)
     }
@@ -47,76 +53,100 @@ impl Slide {
 /// One piece of a slide, in source order.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Segment {
-    /// A run of Markdown (rendered with `render::markdown_to_width`, so embedded
-    /// ` ```mermaid ` diagrams are still drawn inline).
+    /// A run of Markdown, rendered plainly (a ` ``` ` fence is just a code block).
     Markdown(String),
-    /// A ` ```tty ` block: a command to run live in a boxed pseudo-terminal.
+    /// A `<tty>` element: a command to run live in a boxed pseudo-terminal.
     Tty(TtyBlock),
-    /// A language-tagged code fence (e.g. ` ```rust `): rendered with real
-    /// syntax highlighting by an editor (see [`super::tty`]).
+    /// A `<code>` element: code rendered with real syntax highlighting by an
+    /// editor (see [`super::tty`]).
     Code(CodeBlock),
+    /// A `<mermaid>` element: its source, drawn as a diagram.
+    Mermaid(String),
 }
 
-/// A language-tagged code fence: its info-string language and the code body.
+/// A `<code>` element: its `lang`, the code body, and when it is rendered.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CodeBlock {
-    /// The fence's info-string language token (e.g. `rust`, `html`, `js`).
+    /// `lang` — the language token (e.g. `rust`, `html`, `js`) for highlighting.
     pub(crate) lang: String,
-    /// The code between the fences.
+    /// The code between the tags.
     pub(crate) code: String,
-    /// When the highlighting editor is spawned (`render=` attribute).
+    /// When the highlighting editor is spawned (`render` attribute).
     pub(crate) render: RenderMode,
 }
 
 /// When a code block's syntax-highlighting editor is spawned.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub(crate) enum RenderMode {
-    /// Spawn on first view of the slide (`render=lazy`).
+    /// Spawn on first view of the slide (`render="lazy"`).
     #[default]
     Lazy,
-    /// Spawn at deck load and keep in memory (`render=eager`).
+    /// Spawn at deck load and keep in memory (`render="eager"`).
     Eager,
 }
 
-/// A parsed ` ```tty ` block: its fence attributes plus the command body.
+/// A `<tty>` element: its attributes plus the command body.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct TtyBlock {
-    /// `id=` — links the same logical process across slides (for `persist`).
+    /// `id` — links the same logical process across slides (for `persist`).
     pub(crate) id: Option<String>,
     /// `persist` — keep the process alive across a slide change when the next
-    /// slide has a `tty` block with the same `id`.
+    /// slide has a `<tty>` with the same `id`.
     pub(crate) persist: bool,
-    /// `title=` — box title; falls back to the command's first token.
+    /// `title` — box title; falls back to the command's first token.
     pub(crate) title: Option<String>,
-    /// `status=` — fixed status text; falls back to the live process status.
+    /// `status` — fixed status text; falls back to the live process status.
     pub(crate) status: Option<String>,
-    /// `rows=` — box interior height; a default is used when absent.
+    /// `rows` — box interior height; a default is used when absent.
     pub(crate) rows: Option<u16>,
-    /// `cols=` — box interior width; a default is used when absent.
+    /// `cols` — box interior width; a default is used when absent.
     pub(crate) cols: Option<u16>,
-    /// The shell command/script between the fences.
+    /// The shell command/script between the tags.
     pub(crate) command: String,
 }
 
 impl TtyBlock {
-    /// The box title: the `title=` override, else the command's first token
+    /// The box title: the `title` override, else the command's first token
     /// (its first whitespace-delimited word on the first line), else `"tty"`.
     pub(crate) fn display_title(&self) -> &str {
         if let Some(title) = &self.title {
             return title;
         }
-        self.command
-            .split_whitespace()
-            .next()
-            .unwrap_or("tty")
+        self.command.split_whitespace().next().unwrap_or("tty")
     }
 }
 
-/// Split a slide body into [`Segment`]s. Fence-aware in the same hand-rolled
-/// style as [`split_slides`]: a ` ```tty ` opening fence starts a block that
-/// runs to the next closing fence; any other fenced block (```` ```rust ````,
-/// ` ```mermaid `, ...) is passed through verbatim as Markdown so a `tty`-like
-/// line inside it is never mistaken for a block. An unterminated `tty` fence is
+/// An embedded XML element kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Element {
+    Code,
+    Tty,
+    Mermaid,
+}
+
+impl Element {
+    fn from_name(name: &str) -> Option<Self> {
+        match name {
+            "code" => Some(Self::Code),
+            "tty" => Some(Self::Tty),
+            "mermaid" => Some(Self::Mermaid),
+            _ => None,
+        }
+    }
+
+    fn close_tag(self) -> &'static str {
+        match self {
+            Self::Code => "</code>",
+            Self::Tty => "</tty>",
+            Self::Mermaid => "</mermaid>",
+        }
+    }
+}
+
+/// Split a slide body into [`Segment`]s. Markdown fences are opaque — kept whole
+/// as Markdown so a `<code>`-looking line *inside* a code sample is never parsed
+/// as an element. Between fences, a `<code>` / `<tty>` / `<mermaid>` opening tag
+/// starts an element that runs to its closing tag; an unterminated element is
 /// left as Markdown rather than swallowing the rest of the slide.
 fn split_segments(body: &str) -> Vec<Segment> {
     let lines: Vec<&str> = body.lines().collect();
@@ -133,87 +163,97 @@ fn split_segments(body: &str) -> Vec<Segment> {
 
     while pos < lines.len() {
         let trimmed = lines[pos].trim();
-        let Some(open_len) = open_fence_len(trimmed) else {
-            markdown.push(lines[pos]);
-            pos += 1;
-            continue;
-        };
 
-        // Find the matching closing fence for any opening fence.
-        let mut close = pos + 1;
-        while close < lines.len() && !is_close_fence(lines[close].trim(), open_len) {
-            close += 1;
-        }
-        let terminated = close < lines.len();
-
-        if terminated && is_tty_open_fence(trimmed) {
-            flush(&mut markdown, &mut segments);
-            let attrs = trimmed.strip_prefix("```").unwrap_or("").trim();
-            let attrs = attrs.strip_prefix("tty").unwrap_or("");
-            let command = lines[pos + 1..close].join("\n");
-            segments.push(Segment::Tty(parse_tty_attrs(attrs, command)));
-            pos = close + 1;
-        } else if let (true, Some((lang, render))) = (terminated, code_fence_meta(trimmed)) {
-            // A language-tagged fence (```rust, ```html, ...): syntax-highlight it.
-            flush(&mut markdown, &mut segments);
-            let code = lines[pos + 1..close].join("\n");
-            segments.push(Segment::Code(CodeBlock { lang, code, render }));
-            pos = close + 1;
-        } else if terminated {
-            // A plain (untagged) or ```mermaid fence: keep it whole in Markdown.
-            for line in &lines[pos..=close] {
+        // A Markdown code fence is opaque: keep it (and its contents) verbatim.
+        if let Some(open_len) = open_fence_len(trimmed) {
+            let mut close = pos + 1;
+            while close < lines.len() && !is_close_fence(lines[close].trim(), open_len) {
+                close += 1;
+            }
+            let end = close.min(lines.len() - 1);
+            for line in &lines[pos..=end] {
                 markdown.push(line);
             }
-            pos = close + 1;
-        } else {
-            // Unterminated fence: leave it (and the rest) as Markdown.
-            markdown.push(lines[pos]);
-            pos += 1;
+            pos = end + 1;
+            continue;
         }
+
+        // An embedded XML element.
+        if let Some((element, attrs)) = xml_open(trimmed) {
+            let mut close = pos + 1;
+            while close < lines.len() && !xml_close(lines[close].trim(), element) {
+                close += 1;
+            }
+            if close < lines.len() {
+                flush(&mut markdown, &mut segments);
+                let content = lines[pos + 1..close].join("\n");
+                segments.push(match element {
+                    Element::Code => Segment::Code(parse_code_attrs(attrs, content)),
+                    Element::Tty => Segment::Tty(parse_tty_attrs(attrs, content)),
+                    Element::Mermaid => Segment::Mermaid(content),
+                });
+                pos = close + 1;
+                continue;
+            }
+            // Unterminated element: fall through and treat the line as Markdown.
+        }
+
+        markdown.push(lines[pos]);
+        pos += 1;
     }
 
     flush(&mut markdown, &mut segments);
     segments
 }
 
-/// A ` ```tty ` opening fence: a `` ``` `` prefix whose info string's first
-/// token is `tty` (case-insensitive), so attributes may follow it.
-fn is_tty_open_fence(trimmed: &str) -> bool {
-    trimmed
-        .strip_prefix("```")
-        .and_then(|info| info.split_whitespace().next())
-        .is_some_and(|word| word.eq_ignore_ascii_case("tty"))
-}
-
-/// The language token and render mode of a code fence we should
-/// syntax-highlight. Returns `None` when the info string is empty (a plain code
-/// block, left to Markdown) or its first word is `tty`/`mermaid` (handled
-/// elsewhere). The `render=` attribute selects the mode (default [`Lazy`]).
-///
-/// [`Lazy`]: RenderMode::Lazy
-fn code_fence_meta(trimmed: &str) -> Option<(String, RenderMode)> {
-    let info = trimmed.strip_prefix("```")?;
-    let tokens = tokenize_attrs(info);
-    let (lang, _) = tokens.first()?;
-    let lower = lang.to_ascii_lowercase();
-    if lower == "tty" || lower == "mermaid" {
+/// Recognise an opening tag line — `<code …>`, `<tty …>`, or `<mermaid …>` —
+/// returning the element and the attribute substring between the tag name and
+/// the closing `>`. The whole opening tag must be on the one (trimmed) line and
+/// end with `>`; `<codex>`/`<code-block>` and the like are rejected.
+fn xml_open(trimmed: &str) -> Option<(Element, &str)> {
+    let rest = trimmed.strip_prefix('<')?;
+    let name_end = rest
+        .find(|ch: char| !ch.is_ascii_alphabetic())
+        .unwrap_or(rest.len());
+    let element = Element::from_name(&rest[..name_end])?;
+    let after = rest[name_end..].trim_end();
+    let attrs = after.strip_suffix('>')?;
+    let attrs = attrs.strip_suffix('/').unwrap_or(attrs);
+    // The name must be followed by a boundary (whitespace or the `>`), so a
+    // longer name like `code-block` is not matched as `code`.
+    if !attrs.is_empty() && !attrs.starts_with(char::is_whitespace) {
         return None;
     }
+    Some((element, attrs))
+}
+
+/// Whether `trimmed` is the closing tag for `element` (e.g. `</code>`).
+fn xml_close(trimmed: &str, element: Element) -> bool {
+    trimmed == element.close_tag()
+}
+
+/// Parse a `<code>` element's attributes (`lang`, `render`) plus its body.
+fn parse_code_attrs(attrs: &str, code: String) -> CodeBlock {
+    let tokens = tokenize_attrs(attrs);
+    let lang = tokens
+        .iter()
+        .find(|(key, _)| key == "lang")
+        .and_then(|(_, value)| value.clone())
+        .unwrap_or_default();
     let render = tokens
         .iter()
-        .skip(1)
         .find(|(key, _)| key == "render")
         .and_then(|(_, value)| value.as_deref())
         .map_or(RenderMode::Lazy, |value| match value {
             "eager" => RenderMode::Eager,
             _ => RenderMode::Lazy,
         });
-    Some((lang.clone(), render))
+    CodeBlock { lang, code, render }
 }
 
-/// Parse a `tty` fence's attribute string into a [`TtyBlock`]. Attributes are
-/// whitespace-separated `key=value` pairs (values may be `"quoted"`) or bare
-/// flags; unknown keys are ignored.
+/// Parse a `<tty>` element's attributes into a [`TtyBlock`]. Attributes are
+/// whitespace-separated `key="value"` pairs or bare flags (e.g. `persist`);
+/// unknown keys are ignored.
 fn parse_tty_attrs(attrs: &str, command: String) -> TtyBlock {
     let mut block = TtyBlock {
         command,
@@ -233,8 +273,8 @@ fn parse_tty_attrs(attrs: &str, command: String) -> TtyBlock {
     block
 }
 
-/// Tokenize a fence attribute string into `(key, value)` pairs. A bare token
-/// (no `=`) yields `(key, None)`; `key=value` and `key="quoted value"` yield
+/// Tokenize an attribute string into `(key, value)` pairs. A bare token (no `=`)
+/// yields `(key, None)`; `key=value` and `key="quoted value"` yield
 /// `(key, Some(value))`. Whitespace separates tokens except inside quotes.
 fn tokenize_attrs(attrs: &str) -> Vec<(String, Option<String>)> {
     let mut out = Vec::new();
@@ -327,25 +367,41 @@ pub(crate) fn parse_deck(input: &str) -> Deck {
 
 /// Split the document into sections on standalone `---` lines.
 ///
-/// Fence-aware: while inside a ```` ``` ````-fenced code block, a `---` line is
-/// content (it belongs to the code), not a slide separator. The fence is closed
-/// by a line of at least as many back-ticks and nothing else.
+/// Fence- and element-aware: while inside a ` ``` ` fence or a `<code>` /
+/// `<tty>` / `<mermaid>` element, a `---` line is content, not a separator.
 fn split_slides(input: &str) -> Vec<String> {
+    /// What opaque block the splitter is currently inside.
+    enum State {
+        Open,
+        Fence(usize),
+        Xml(Element),
+    }
+
     let mut sections = Vec::new();
     let mut current: Vec<&str> = Vec::new();
-    let mut fence: Option<usize> = None;
+    let mut state = State::Open;
+
     for line in input.lines() {
         let trimmed = line.trim();
-        match fence {
-            Some(open_len) => {
+        match state {
+            State::Fence(open_len) => {
                 if is_close_fence(trimmed, open_len) {
-                    fence = None;
+                    state = State::Open;
                 }
                 current.push(line);
             }
-            None => {
+            State::Xml(element) => {
+                if xml_close(trimmed, element) {
+                    state = State::Open;
+                }
+                current.push(line);
+            }
+            State::Open => {
                 if let Some(open_len) = open_fence_len(trimmed) {
-                    fence = Some(open_len);
+                    state = State::Fence(open_len);
+                    current.push(line);
+                } else if let Some((element, _)) = xml_open(trimmed) {
+                    state = State::Xml(element);
                     current.push(line);
                 } else if trimmed == "---" {
                     sections.push(current.join("\n"));
@@ -451,24 +507,35 @@ fn is_identifier(text: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{Segment, parse_deck, split_segments};
+    use super::{RenderMode, Segment, parse_deck, split_segments};
 
     fn tty(segment: &Segment) -> &super::TtyBlock {
         match segment {
             Segment::Tty(block) => block,
-            Segment::Markdown(_) | Segment::Code(_) => panic!("expected a tty segment"),
+            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) => {
+                panic!("expected a tty segment")
+            }
+        }
+    }
+
+    fn code(segment: &Segment) -> &super::CodeBlock {
+        match segment {
+            Segment::Code(block) => block,
+            Segment::Markdown(_) | Segment::Tty(_) | Segment::Mermaid(_) => {
+                panic!("expected a code segment")
+            }
         }
     }
 
     #[test]
-    fn body_without_tty_is_a_single_markdown_segment() {
+    fn body_without_elements_is_a_single_markdown_segment() {
         let segs = split_segments("# Title\n\nsome **text**");
         assert_eq!(segs, vec![Segment::Markdown("# Title\n\nsome **text**".into())]);
     }
 
     #[test]
-    fn tty_block_splits_markdown_around_it() {
-        let body = "# Demo\n\n```tty\ncounter\n```\n\nafter";
+    fn tty_element_splits_markdown_around_it() {
+        let body = "# Demo\n\n<tty>\ncounter\n</tty>\n\nafter";
         let segs = split_segments(body);
         assert_eq!(segs.len(), 3);
         assert_eq!(segs[0], Segment::Markdown("# Demo\n".into()));
@@ -478,11 +545,8 @@ mod tests {
 
     #[test]
     fn tty_attributes_are_parsed_with_quotes_and_flags() {
-        let body = "```tty id=counter persist title=\"Live counter\" rows=12 cols=40\nwhile :; do echo hi; done\n```";
-        let block = match &split_segments(body)[0] {
-            Segment::Tty(block) => block.clone(),
-            Segment::Markdown(_) | Segment::Code(_) => panic!("expected tty"),
-        };
+        let body = "<tty id=\"counter\" persist title=\"Live counter\" rows=\"12\" cols=\"40\">\nwhile :; do echo hi; done\n</tty>";
+        let block = tty(&split_segments(body)[0]).clone();
         assert_eq!(block.id.as_deref(), Some("counter"));
         assert!(block.persist);
         assert_eq!(block.title.as_deref(), Some("Live counter"));
@@ -493,10 +557,7 @@ mod tests {
 
     #[test]
     fn tty_defaults_when_attributes_absent() {
-        let block = match &split_segments("```tty\nhtop\n```")[0] {
-            Segment::Tty(block) => block.clone(),
-            Segment::Markdown(_) | Segment::Code(_) => panic!("expected tty"),
-        };
+        let block = tty(&split_segments("<tty>\nhtop\n</tty>")[0]).clone();
         assert!(block.id.is_none());
         assert!(!block.persist);
         assert!(block.title.is_none());
@@ -504,40 +565,8 @@ mod tests {
     }
 
     #[test]
-    fn unterminated_tty_fence_stays_markdown() {
-        let body = "```tty\ncounter\nno closing fence";
-        let segs = split_segments(body);
-        assert_eq!(segs, vec![Segment::Markdown(body.into())]);
-    }
-
-    #[test]
-    fn mermaid_fence_is_kept_whole_as_markdown() {
-        // ```mermaid is drawn by the markdown renderer, not extracted as code.
-        let body = "```mermaid\ngraph TD; tty-->x\n```";
-        let segs = split_segments(body);
-        assert_eq!(segs, vec![Segment::Markdown(body.into())]);
-    }
-
-    #[test]
-    fn plain_untagged_fence_stays_markdown() {
-        // No info-string language -> a plain code block, left to termimad.
-        let body = "```\nplain code\n```";
-        let segs = split_segments(body);
-        assert_eq!(segs, vec![Segment::Markdown(body.into())]);
-    }
-
-    fn code(segment: &Segment) -> &super::CodeBlock {
-        match segment {
-            Segment::Code(block) => block,
-            Segment::Markdown(_) | Segment::Tty(_) => panic!("expected a code segment"),
-        }
-    }
-
-    #[test]
-    fn language_tagged_fence_becomes_a_code_segment() {
-        use super::RenderMode;
-        let body = "# Title\n\n```rust\nfn main() {}\n```";
-        let segs = split_segments(body);
+    fn code_element_carries_lang_and_render() {
+        let segs = split_segments("# Title\n\n<code lang=\"rust\">\nfn main() {}\n</code>");
         assert_eq!(segs.len(), 2);
         assert_eq!(segs[0], Segment::Markdown("# Title\n".into()));
         let block = code(&segs[1]);
@@ -548,10 +577,59 @@ mod tests {
 
     #[test]
     fn render_attribute_selects_eager_or_lazy() {
-        use super::RenderMode;
-        assert_eq!(code(&split_segments("```rust render=eager\nx\n```")[0]).render, RenderMode::Eager);
-        assert_eq!(code(&split_segments("```rust render=lazy\nx\n```")[0]).render, RenderMode::Lazy);
-        assert_eq!(code(&split_segments("```rust render=bogus\nx\n```")[0]).render, RenderMode::Lazy);
+        let eager = "<code lang=\"rust\" render=\"eager\">\nx\n</code>";
+        let lazy = "<code lang=\"rust\" render=\"lazy\">\nx\n</code>";
+        let bogus = "<code lang=\"rust\" render=\"bogus\">\nx\n</code>";
+        assert_eq!(code(&split_segments(eager)[0]).render, RenderMode::Eager);
+        assert_eq!(code(&split_segments(lazy)[0]).render, RenderMode::Lazy);
+        assert_eq!(code(&split_segments(bogus)[0]).render, RenderMode::Lazy);
+    }
+
+    #[test]
+    fn mermaid_element_becomes_a_mermaid_segment() {
+        let segs = split_segments("<mermaid>\nflowchart LR; A --> B\n</mermaid>");
+        assert_eq!(segs, vec![Segment::Mermaid("flowchart LR; A --> B".into())]);
+    }
+
+    #[test]
+    fn unterminated_element_stays_markdown() {
+        let body = "<code lang=\"rust\">\nfn main() {}\nno closing tag";
+        let segs = split_segments(body);
+        assert_eq!(segs, vec![Segment::Markdown(body.into())]);
+    }
+
+    #[test]
+    fn code_shown_inside_a_fence_is_not_an_element() {
+        // A `<code>` inside a Markdown code sample stays Markdown.
+        let body = "```html\n<code lang=\"rust\">x</code>\n```";
+        let segs = split_segments(body);
+        assert_eq!(segs, vec![Segment::Markdown(body.into())]);
+    }
+
+    #[test]
+    fn plain_fences_stay_markdown() {
+        // ```mermaid and ```rust fences are now plain code, not special blocks.
+        for body in ["```\nplain\n```", "```rust\nfn main() {}\n```", "```mermaid\nA-->B\n```"] {
+            assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
+        }
+    }
+
+    #[test]
+    fn looks_like_element_but_longer_name_is_markdown() {
+        let body = "<codex>\nx\n</codex>";
+        assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
+    }
+
+    #[test]
+    fn separator_inside_an_element_is_not_a_split() {
+        // A `---` inside a `<code>` block is code, not a slide separator.
+        let deck = parse_deck("# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>\n\n---\n\n# Next");
+        assert_eq!(deck.slides.len(), 2);
+        assert_eq!(
+            deck.slides[0].body,
+            "# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>"
+        );
+        assert_eq!(deck.slides[1].body, "# Next");
     }
 
     #[test]

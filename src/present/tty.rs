@@ -392,7 +392,7 @@ impl ProcessManager {
     ) {
         for (block_index, segment) in segments.iter().enumerate() {
             match segment {
-                Segment::Markdown(_) => {}
+                Segment::Markdown(_) | Segment::Mermaid(_) => {}
                 Segment::Tty(block) => {
                     let (rows, cols) = box_interior(
                         block,
@@ -478,7 +478,7 @@ impl ProcessManager {
     /// keeps repainting for live output and the blinking status indicator).
     pub(crate) fn any_running(&self, current: usize, segments: &[Segment]) -> bool {
         segments.iter().enumerate().any(|(block_index, segment)| match segment {
-            Segment::Markdown(_) => false,
+            Segment::Markdown(_) | Segment::Mermaid(_) => false,
             Segment::Tty(block) => self
                 .proc_for(current, block_index, block)
                 .is_some_and(ManagedProc::is_running),
@@ -538,7 +538,7 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
         .iter()
         .filter_map(|segment| match segment {
             Segment::Tty(block) => persistent_id(block).map(str::to_owned),
-            Segment::Markdown(_) | Segment::Code(_) => None,
+            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) => None,
         })
         .collect()
 }

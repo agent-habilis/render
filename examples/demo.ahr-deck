@@ -25,13 +25,13 @@ title: Diagrams
 
 ## Mermaid, inline
 
-```mermaid
+<mermaid>
 flowchart LR
     A[Write .ahr-deck] --> B[ahr deck.ahr-deck]
     B --> C{Present}
     C --> D[Arrow keys]
     C --> E[q to quit]
-```
+</mermaid>
 
 ---
 
@@ -53,9 +53,9 @@ title: Live shell
 
 ## Real processes, live
 
-```tty id=counter persist title="Live counter" rows=8 cols=44
+<tty id="counter" persist title="Live counter" rows="8" cols="44">
 i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
-```
+</tty>
 
 This box runs a real shell command, streaming its output.
 
@@ -70,9 +70,9 @@ title: It keeps running
 The counter is `persist` with `id=counter`, so it was **not** restarted —
 it kept counting across the slide change.
 
-```tty id=counter persist title="Live counter" rows=8 cols=44
+<tty id="counter" persist title="Live counter" rows="8" cols="44">
 i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
-```
+</tty>
 
 ---
 
@@ -82,11 +82,11 @@ title: Colors
 
 ## Colors, like a native terminal
 
-```tty title="Ephemeral (no id)" rows=8 cols=44
+<tty title="Ephemeral (no id)" rows="8" cols="44">
 printf '\033[31mred\033[0m \033[32mgreen\033[0m \033[33myellow\033[0m \033[34mblue\033[0m\n'
 for n in 1 2 3 4 5; do echo "line $n"; sleep 0.4; done
 echo done
-```
+</tty>
 
 No `id`, so this one is killed when you leave — and restarts if you return.
 

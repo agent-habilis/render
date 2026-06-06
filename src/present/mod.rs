@@ -2,14 +2,16 @@
 //!
 //! [`run`] parses the deck, takes over the terminal with [`ratatui::init`] (raw
 //! mode + alternate screen + a restore-on-panic hook), and drives an [`App`]
-//! loop. Each slide is split into [`Segment`]s: Markdown (rendered with
-//! [`crate::render::markdown_to_width`], so embedded ` ```mermaid ` diagrams are
-//! drawn inline) and ` ```tty ` blocks (live processes drawn into bordered boxes
-//! by [`tty`]). Arrow keys move between slides; `q`/`Esc` quits.
+//! loop. Each slide is split into [`Segment`]s: plain Markdown, plus the
+//! embedded XML elements — `<code>` (syntax-highlighted by an editor), `<tty>`
+//! (a live process drawn into a bordered box), and `<mermaid>` (a drawn
+//! diagram); the latter two via [`tty`] / [`crate::render`]. Arrow keys move
+//! between slides; `q`/`Esc` quits.
 //!
 //! The loop is tick-driven rather than blocking: between key presses it repaints
-//! so a running `tty` process streams its output live and its status indicator
-//! blinks. Navigating reconciles the running processes (see [`tty`]).
+//! so a running `<tty>`/`<code>` process streams live and the status indicator
+//! blinks. Static segments (Markdown/Mermaid) are rendered once per slide+width
+//! and cached. Navigating reconciles the running processes (see [`tty`]).
 
 mod parse;
 mod tty;
@@ -75,6 +77,20 @@ struct App {
     manager: ProcessManager,
     current: usize,
     start: Instant,
+    static_render: StaticRender,
+}
+
+/// Memoized renders of the static segments (Markdown / Mermaid) for the current
+/// slide. These depend only on the segment source and the wrap width, so they
+/// are reused across the (up to ~10 Hz) repaints a running process triggers,
+/// rather than re-running termimad/figurehead every frame.
+#[derive(Debug, Default)]
+struct StaticRender {
+    /// The `(slide, content_w)` the cache is valid for.
+    key: Option<(usize, usize)>,
+    /// By block index: the rendered `(text, width, height)`, or `None` for the
+    /// live `Tty`/`Code` segments (whose layout is recomputed each frame).
+    items: Vec<Option<(Text<'static>, u16, u16)>>,
 }
 
 impl App {
@@ -84,6 +100,7 @@ impl App {
             manager: ProcessManager::new(),
             current: 0,
             start: Instant::now(),
+            static_render: StaticRender::default(),
         }
     }
 
@@ -128,10 +145,12 @@ impl App {
                 width: cols,
                 height: rows,
             } = terminal.size().unwrap_or(Size::new(80, 24));
+            let content_w = content_width(cols);
             let content_rows = rows.saturating_sub(FOOTER_ROWS);
-            let content_cols = u16::try_from(content_width(cols)).unwrap_or(u16::MAX);
+            let content_cols = u16::try_from(content_w).unwrap_or(u16::MAX);
             self.manager
                 .ensure(self.current, &segments, content_rows, content_cols);
+            self.refresh_static_render(&segments, content_w);
 
             let running = self.manager.any_running(self.current, &segments);
             if drawn != Some((self.current, cols, rows)) || running {
@@ -158,6 +177,27 @@ impl App {
                 }
             }
         }
+    }
+
+    /// Rebuild the [`StaticRender`] cache when the slide or wrap width changed;
+    /// a no-op (one key comparison) on every other frame.
+    fn refresh_static_render(&mut self, segments: &[Segment], content_w: usize) {
+        let key = (self.current, content_w);
+        if self.static_render.key == Some(key) {
+            return;
+        }
+        let items = segments
+            .iter()
+            .map(|segment| match segment {
+                Segment::Markdown(src) => Some(markdown_item(src, content_w)),
+                Segment::Mermaid(src) => Some(mermaid_item(src)),
+                Segment::Tty(_) | Segment::Code(_) => None,
+            })
+            .collect();
+        self.static_render = StaticRender {
+            key: Some(key),
+            items,
+        };
     }
 
     /// Draw the current slide: a vertically-centered stack of its segments, with
@@ -201,13 +241,17 @@ impl App {
         let mut items = Vec::new();
         for (block_index, segment) in segments.iter().enumerate() {
             match segment {
-                Segment::Markdown(src) => {
-                    let (text, width, height) = markdown_item(src, content_w);
-                    if height > 0 {
+                // Static segments are rendered once into `static_render` (keyed
+                // by slide + width) and reused across repaints.
+                Segment::Markdown(_) | Segment::Mermaid(_) => {
+                    if let Some(Some((text, width, height))) =
+                        self.static_render.items.get(block_index)
+                        && *height > 0
+                    {
                         items.push(Item {
-                            width: width.min(content.width),
-                            height,
-                            kind: ItemKind::Markdown(text),
+                            width: (*width).min(content.width),
+                            height: *height,
+                            kind: ItemKind::Markdown(text.clone()),
                         });
                     }
                 }
@@ -344,11 +388,23 @@ enum ItemKind {
     Code(usize),
 }
 
-/// Render a Markdown source to an ANSI string, then to a `ratatui` [`Text`],
-/// returning it with its measured display width and line count (surrounding
-/// blank lines trimmed so vertical centering is not skewed).
+/// A Markdown segment rendered (plainly — no embedded-diagram handling) to a
+/// `ratatui` [`Text`] with its measured size.
 fn markdown_item(src: &str, content_w: usize) -> (Text<'static>, u16, u16) {
-    let rendered = render::markdown_to_width(src, content_w);
+    block_text(&render::markdown_plain(src, content_w))
+}
+
+/// A `<mermaid>` segment drawn to a `ratatui` [`Text`] with its measured size,
+/// falling back to the raw source when the diagram cannot be rendered.
+fn mermaid_item(src: &str) -> (Text<'static>, u16, u16) {
+    let rendered = render::mermaid(src).unwrap_or_else(|_| src.to_owned());
+    block_text(&rendered)
+}
+
+/// Convert a rendered (ANSI) block to a `ratatui` [`Text`], returning it with its
+/// measured display width and line count (surrounding blank lines trimmed so
+/// vertical centering is not skewed).
+fn block_text(rendered: &str) -> (Text<'static>, u16, u16) {
     let mut lines: Vec<&str> = rendered.split('\n').collect();
     while lines.last().is_some_and(|line| line.trim().is_empty()) {
         lines.pop();
@@ -423,4 +479,37 @@ fn action_for(key: &KeyEvent) -> Option<Action> {
         return Some(Action::Quit);
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use super::App;
+    use super::parse::parse_deck;
+
+    #[test]
+    fn static_render_caches_static_segments_not_processes() {
+        // Slide: markdown heading, a <mermaid>, and a <tty> — in that order.
+        let deck = parse_deck(
+            "# H\n\n<mermaid>\nflowchart LR; A --> B\n</mermaid>\n\n<tty>\necho hi\n</tty>",
+        );
+        let segments = deck.slides[0].segments();
+        let mut app = App::new(deck);
+
+        app.refresh_static_render(&segments, 80);
+        assert_eq!(app.static_render.key, Some((0, 80)));
+        assert_eq!(app.static_render.items.len(), segments.len());
+        // Markdown + Mermaid are cached; the live <tty> is not.
+        let cached = app.static_render.items.iter().filter(|item| item.is_some()).count();
+        let live = app.static_render.items.iter().filter(|item| item.is_none()).count();
+        assert_eq!(cached, 2);
+        assert_eq!(live, 1);
+
+        // Same (slide, width): the key is retained (rebuild is skipped).
+        app.refresh_static_render(&segments, 80);
+        assert_eq!(app.static_render.key, Some((0, 80)));
+
+        // A width change re-keys the cache.
+        app.refresh_static_render(&segments, 60);
+        assert_eq!(app.static_render.key, Some((0, 60)));
+    }
 }

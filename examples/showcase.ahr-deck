@@ -32,11 +32,11 @@ title: Live shell
 
 ## A live code block
 
-A ` ```tty ` fence runs a real command, streaming its output live:
+A `<tty>` element runs a real command, streaming its output live:
 
-```tty title="date, live" rows=6 cols=46
+<tty title="date, live" rows="6" cols="46">
 while :; do date "+%H:%M:%S"; sleep 1; done
-```
+</tty>
 
 ---
 
@@ -46,11 +46,11 @@ title: Live counter
 
 ## A persistent live block
 
-This counter has `id=counter` + `persist`, so it survives to the next slide:
+This counter has `id="counter"` + `persist`, so it survives to the next slide:
 
-```tty id=counter persist title="counter" rows=8 cols=46
+<tty id="counter" persist title="counter" rows="8" cols="46">
 i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
-```
+</tty>
 
 ---
 
@@ -62,9 +62,9 @@ title: Same counter, kept alive
 
 It was **not** restarted — same `id`, so it kept counting:
 
-```tty id=counter persist title="counter" rows=8 cols=46
+<tty id="counter" persist title="counter" rows="8" cols="46">
 i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
-```
+</tty>
 
 ---
 
@@ -74,7 +74,7 @@ title: Rust
 
 ## Rust, syntax highlighted
 
-```rust render=eager
+<code lang="rust" render="eager">
 use std::collections::HashMap;
 
 fn main() {
@@ -84,7 +84,7 @@ fn main() {
     }
     println!("{counts:?}");
 }
-```
+</code>
 
 ---
 
@@ -94,7 +94,7 @@ title: HTML
 
 ## HTML, syntax highlighted
 
-```html
+<code lang="html">
 <!doctype html>
 <html lang="en">
   <body>
@@ -103,7 +103,7 @@ title: HTML
     <p>Slides in your <strong>terminal</strong>.</p>
   </body>
 </html>
-```
+</code>
 
 ---
 
@@ -113,7 +113,7 @@ title: JavaScript
 
 ## JavaScript, syntax highlighted
 
-```js
+<code lang="js">
 const slides = ["intro", "demo", "thanks"];
 
 function present(deck) {
@@ -121,7 +121,7 @@ function present(deck) {
 }
 
 console.log(present(slides));
-```
+</code>
 
 ---
 
@@ -131,7 +131,7 @@ title: Markdown source
 
 ## Markdown, as highlighted source
 
-```markdown
+<code lang="markdown">
 # Heading
 
 - a **bold** point
@@ -139,8 +139,8 @@ title: Markdown source
 
 > a blockquote
 
-`inline code` and a fence below.
-```
+`inline code` and a list above.
+</code>
 
 ---
 
