@@ -1,0 +1,166 @@
+```deck
+title: ahr-deck showcase
+```
+
+# ahr-deck showcase
+
+Code blocks, **live** shells, and real syntax highlighting — all in the
+terminal.
+
+Arrow keys to navigate, `q` to quit.
+
+---
+
+```deck:slide
+title: Plain code block
+```
+
+## A plain code block
+
+An untagged fence renders as a styled (non-highlighted) block:
+
+```
+$ ahr showcase.ahr-deck
+rendering 11 slides…
+```
+
+---
+
+```deck:slide
+title: Live shell
+```
+
+## A live code block
+
+A ` ```tty ` fence runs a real command, streaming its output live:
+
+```tty title="date, live" rows=6 cols=46
+while :; do date "+%H:%M:%S"; sleep 1; done
+```
+
+---
+
+```deck:slide
+title: Live counter
+```
+
+## A persistent live block
+
+This counter has `id=counter` + `persist`, so it survives to the next slide:
+
+```tty id=counter persist title="counter" rows=8 cols=46
+i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
+```
+
+---
+
+```deck:slide
+title: Same counter, kept alive
+```
+
+## The same process, one slide later
+
+It was **not** restarted — same `id`, so it kept counting:
+
+```tty id=counter persist title="counter" rows=8 cols=46
+i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
+```
+
+---
+
+```deck:slide
+title: Rust
+```
+
+## Rust, syntax highlighted
+
+```rust render=eager
+use std::collections::HashMap;
+
+fn main() {
+    let mut counts: HashMap<&str, u32> = HashMap::new();
+    for word in "a b a c b a".split_whitespace() {
+        *counts.entry(word).or_insert(0) += 1;
+    }
+    println!("{counts:?}");
+}
+```
+
+---
+
+```deck:slide
+title: HTML
+```
+
+## HTML, syntax highlighted
+
+```html
+<!doctype html>
+<html lang="en">
+  <body>
+    <h1 class="title">ahr-deck</h1>
+    <!-- a comment -->
+    <p>Slides in your <strong>terminal</strong>.</p>
+  </body>
+</html>
+```
+
+---
+
+```deck:slide
+title: JavaScript
+```
+
+## JavaScript, syntax highlighted
+
+```js
+const slides = ["intro", "demo", "thanks"];
+
+function present(deck) {
+  return deck.map((name, i) => `${i + 1}. ${name}`).join("\n");
+}
+
+console.log(present(slides));
+```
+
+---
+
+```deck:slide
+title: Markdown source
+```
+
+## Markdown, as highlighted source
+
+```markdown
+# Heading
+
+- a **bold** point
+- a [link](https://example.com)
+
+> a blockquote
+
+`inline code` and a fence below.
+```
+
+---
+
+```deck:slide
+title: Markdown rendered
+```
+
+## Markdown, rendered
+
+- a **bold** point and some *emphasis*
+- a [link](https://example.com)
+- `inline code`
+
+> A blockquote, styled by the renderer.
+
+1. first
+2. second
+
+---
+
+# Thanks
+
+Made with `ahr` by agent-habilis.
