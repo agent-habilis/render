@@ -1,9 +1,21 @@
-// The public surface is just `run_cli`; everything else stays `pub(crate)`.
+// The public surface is just `run`; everything else stays `pub(crate)`.
 pub(crate) mod cli;
 pub(crate) mod deck;
 pub(crate) mod img;
 pub(crate) mod markdown;
 pub(crate) mod mermaid;
 pub(crate) mod table;
+pub(crate) mod util;
 
-pub use cli::run_cli;
+use std::process::ExitCode;
+
+#[must_use]
+pub fn run() -> ExitCode {
+    match cli::run_cli() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(error) => {
+            util::output::error(&format!("{error:#}"));
+            ExitCode::FAILURE
+        }
+    }
+}

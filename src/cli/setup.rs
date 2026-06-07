@@ -1,7 +1,8 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
-use console::style;
+
+use crate::util::output::{status, warn};
 
 const SKILL: &str = include_str!("../../skill/SKILL.md");
 
@@ -174,16 +175,6 @@ fn home_dir() -> Result<PathBuf> {
         Some(home) if !home.is_empty() => Ok(PathBuf::from(home)),
         _ => bail!("$HOME is not set; cannot locate the agent skills directories"),
     }
-}
-
-/// `console` strips the color when stderr isn't a terminal, so piped/captured
-/// output (an agent running `ah-r setup`) stays clean.
-fn status(verb: &str, msg: &str) {
-    eprintln!("{} {msg}", style(format!("{verb:>12}")).green().bold());
-}
-
-fn warn(msg: &str) {
-    eprintln!("{}: {msg}", style("warning").yellow().bold());
 }
 
 #[cfg(test)]

@@ -12,8 +12,12 @@ extension. The layout follows from that:
   exposing a single `pub(crate)` entry function. `src/cli/mod.rs` maps each
   extension to one of them.
 - **A type's helpers live inside that type's module**, not in a loose file. The
-  `src/` root holds only `main.rs`, `lib.rs`, `cli/`, and the type folders — do
-  not drop a `src/foo.rs` helper file next to them.
+  `src/` root holds only `main.rs`, `lib.rs`, `cli/`, `util/`, and the type
+  folders — do not drop a `src/foo.rs` helper file next to them.
+- **Reusable user-facing output lives in `src/util/output.rs`.** The
+  `status`/`warn`/`error` message helpers (cargo-style stderr lines, color-aware
+  via `console`) are defined once there; call them rather than re-`eprintln!`ing
+  a styled message elsewhere.
 - **Deck components reuse the top-level type modules.** A `<...>` block in
   `src/deck/components/` calls into `crate::mermaid`, `crate::img`, etc.
   rather than duplicating that type's rendering logic.

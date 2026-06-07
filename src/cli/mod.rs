@@ -15,7 +15,7 @@ use args::{Cli, Command};
 /// # Errors
 /// A bad extension, an unreadable or empty file, a rendering failure, or a
 /// filesystem error while installing/removing the skill.
-pub fn run_cli() -> Result<()> {
+pub(crate) fn run_cli() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
         Some(Command::Setup { execute, agents }) => setup::setup(execute, &agents),

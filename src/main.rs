@@ -1,5 +1,5 @@
-use anyhow::Result;
+use std::process::ExitCode;
 
-fn main() -> Result<()> {
-    agent_habilis_render::run_cli()
+fn main() -> ExitCode {
+    agent_habilis_render::run()
 }
