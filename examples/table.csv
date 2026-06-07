@@ -1,0 +1,5 @@
+language,paradigm,first appeared,notable for
+Rust,"multi-paradigm, systems",2015,"memory safety without a GC"
+Python,"multi-paradigm, scripting",1991,readability
+Haskell,purely functional,1990,"laziness, strong types"
+Lisp,functional,1958,"code as data, macros"

@@ -4,8 +4,7 @@ use xshell::{Shell, cmd};
 
 use crate::TaskOutcome;
 
-/// `cargo task setup [-- <args>]` — install the `/render` agent skill by running
-/// the binary's `setup` subcommand. Trailing args pass through, so this is
+/// Trailing args pass through to the binary's `setup` subcommand, so this is
 /// dry-run unless `--execute` (the binary owns that behavior).
 pub(crate) fn setup(sh: &Shell, args: &[String]) -> TaskOutcome {
     run_ahr(sh, "setup", args)

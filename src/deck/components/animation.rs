@@ -17,17 +17,14 @@ const MAX_MS: f32 = 3_600_000.0;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct AnimationComponent {
-    /// Milliseconds each frame is shown (from the `seconds` attribute).
     pub(crate) frame_ms: u32,
     /// `loop`: wrap back to the first frame forever; else hold the last.
     pub(crate) looping: bool,
-    /// Frames in order, each verbatim preformatted text.
+    /// Each frame verbatim, as preformatted text.
     pub(crate) frames: Vec<String>,
 }
 
 impl AnimationComponent {
-    /// Parse an `<animation>` component's attributes (`seconds`, `loop`) and split
-    /// its body into `<frame>` children (each taken verbatim).
     #[expect(
         clippy::cast_possible_truncation,
         clippy::cast_sign_loss,
@@ -56,7 +53,6 @@ impl AnimationComponent {
         }
     }
 
-    /// The active frame index at `elapsed` since the slide opened.
     pub(crate) fn frame_index(&self, elapsed: Duration) -> usize {
         let count = self.frames.len();
         if count <= 1 {
@@ -118,7 +114,7 @@ fn parse_frames(content: &str) -> Vec<String> {
                 close += 1;
             }
             if close >= lines.len() {
-                break; // unterminated frame
+                break;
             }
             frames.push(lines[pos + 1..close].join("\n"));
             pos = close + 1;

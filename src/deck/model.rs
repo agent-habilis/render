@@ -22,8 +22,7 @@ pub(crate) struct Deck {
     pub(crate) slides: Vec<Slide>,
 }
 
-/// A single slide: its raw Markdown body and an optional per-slide title that
-/// overrides the deck title in the footer.
+/// A per-slide `title` overrides the deck title in the footer.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Slide {
     pub(crate) title: Option<String>,
@@ -31,34 +30,27 @@ pub(crate) struct Slide {
 }
 
 impl Slide {
-    /// The title shown in the footer for this slide: the per-slide override if
-    /// present, otherwise the deck title (possibly `None`).
     pub(crate) fn footer_title<'deck>(&'deck self, deck: &'deck Deck) -> Option<&'deck str> {
         self.title.as_deref().or(deck.title.as_deref())
     }
 
-    /// Split the slide body into ordered segments: runs of Markdown interleaved
-    /// with the embedded components. A slide with no component yields a single
-    /// [`Segment::Markdown`] holding the whole body.
+    /// A slide with no component yields a single [`Segment::Markdown`] holding
+    /// the whole body.
     pub(crate) fn segments(&self) -> Vec<Segment> {
         split_segments(&self.body)
     }
 }
 
-/// Which scope a leading metadata tag configures.
 #[derive(Debug, Clone, Copy)]
 enum MetaKind {
-    /// A `<deck …/>` tag: applies to the whole deck.
+    /// Applies to the whole deck.
     Deck,
-    /// A `<slide …/>` tag: applies to the current slide.
+    /// Applies to the current slide.
     Slide,
 }
 
-/// Parse and validate a deck. A malformed or empty document yields the slides it
-/// can (possibly none — the caller treats that as an error).
-///
-/// # Errors
-/// More than one `<deck>` tag in the document.
+/// A malformed or empty document yields the slides it can (possibly none — the
+/// caller treats that as an error).
 pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
     let mut deck = Deck::default();
     let mut deck_tags = 0_usize;
@@ -101,10 +93,8 @@ pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
     Ok(deck)
 }
 
-/// Split the document into sections on standalone `---` lines.
-///
-/// Fence- and component-aware: while inside a ` ``` ` fence or a component, a
-/// `---` line is content, not a separator.
+/// Splits on standalone `---` lines, but fence- and component-aware: while
+/// inside a ` ``` ` fence or a component, a `---` line is content.
 fn split_slides(input: &str) -> Vec<String> {
     enum State {
         Open,
@@ -151,9 +141,6 @@ fn split_slides(input: &str) -> Vec<String> {
     sections
 }
 
-/// Peel leading `<deck …/>` / `<slide …/>` frontmatter tags off a section,
-/// returning the parsed tags (in order) and the remaining body.
-///
 /// Only tags at the very start (after blank lines) are treated as metadata; a
 /// `<deck/>` later in the slide is ordinary Markdown. Each tag is a single line.
 fn strip_meta_tags(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
@@ -175,10 +162,8 @@ fn strip_meta_tags(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
     (tags, lines[pos..].join("\n"))
 }
 
-/// Recognise a self-closing frontmatter tag — `<deck …/>` or `<slide …/>` —
-/// returning its kind and `title` attribute (if any). The name must be followed
-/// by whitespace or the tag's end, and the tag must close with `>` (the `/` is
-/// tolerated but optional); other attributes are ignored.
+/// The name must be followed by whitespace or the tag's end, and the tag must
+/// close with `>` (the `/` is tolerated but optional); other attributes ignored.
 fn meta_tag(trimmed: &str) -> Option<(MetaKind, Option<String>)> {
     let rest = trimmed.strip_prefix('<')?;
     let (kind, after) = if let Some(after) = rest.strip_prefix("deck") {

@@ -13,16 +13,14 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
-use crate::{deck, markdown, mermaid};
+use crate::{deck, markdown, mermaid, table};
 use args::{Cli, Command};
 
-/// Parse `argv` and run the selected command — render a file (default), or
-/// install/remove the `/render` skill.
+/// Render a file (default), or install/remove the `/render` skill.
 ///
 /// # Errors
-/// An unsupported/missing extension, a file that can't be read (not found,
-/// permission, non-UTF-8), empty contents, a rendering error, or a filesystem
-/// error while installing/removing the skill.
+/// A bad extension, an unreadable or empty file, a rendering failure, or a
+/// filesystem error while installing/removing the skill.
 pub fn run_cli() -> Result<()> {
     let cli = Cli::parse();
     match cli.command {
@@ -38,11 +36,12 @@ pub fn run_cli() -> Result<()> {
     }
 }
 
-/// Which renderer to drive, resolved from the input file's extension.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Format {
     Mermaid,
     Markdown,
+    /// A delimited-data table; the byte is the field separator (`,` / tab).
+    Table(u8),
     Deck,
 }
 
@@ -55,6 +54,8 @@ fn format_for_extension(path: &Path) -> Option<Format> {
     {
         Some("mmd" | "mermaid") => Some(Format::Mermaid),
         Some("md" | "markdown") => Some(Format::Markdown),
+        Some("csv") => Some(Format::Table(b',')),
+        Some("tsv" | "tab") => Some(Format::Table(b'\t')),
         Some("ah-r") => Some(Format::Deck),
         _ => None,
     }
@@ -64,7 +65,7 @@ fn render_file(path: &Path) -> Result<()> {
     // Resolve the renderer before reading, so a bad extension fails fast.
     let Some(format) = format_for_extension(path) else {
         bail!(
-            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, or .ah-r extension",
+            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, .csv, .tsv, or .ah-r extension",
             path.display()
         );
     };
@@ -80,6 +81,7 @@ fn render_file(path: &Path) -> Result<()> {
     let rendered = match format {
         Format::Mermaid => mermaid::mermaid(&input)?,
         Format::Markdown => markdown::markdown(&input),
+        Format::Table(delimiter) => table::table(&input, delimiter),
         // A presentation takes over the terminal and returns from here. It needs
         // an interactive TTY on both ends: stdout to draw, stdin so key events
         // reach the loop — otherwise it strands on the alternate screen.

@@ -14,21 +14,16 @@ use syntect::highlighting::{Theme, ThemeSet};
 use syntect::parsing::SyntaxSet;
 use syntect::util::{LinesWithEndings, as_24_bit_terminal_escaped};
 
-/// The expanded syntax set (Rust, TOML, … included), loaded once.
 static SYNTAXES: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
 
-/// The vendored Tokyo Night Moon theme, embedded in the binary and parsed once.
 static THEME: LazyLock<Theme> = LazyLock::new(|| {
     let bytes = include_bytes!("../../assets/themes/tokyonight_moon.tmTheme");
     ThemeSet::load_from_reader(&mut std::io::Cursor::new(&bytes[..]))
         .expect("vendored tokyonight_moon.tmTheme is a valid TextMate theme")
 });
 
-/// Highlight `code` as `lang`, returning text with 24-bit ANSI color escapes.
-///
-/// The language token is matched against syntect's name/extension index (a few
-/// common aliases are normalized first); an unknown token falls back to plain
-/// text, so the code is still returned verbatim — just uncolored.
+/// An unknown `lang` token falls back to plain text, so the code is still
+/// returned verbatim — just uncolored.
 pub(crate) fn highlight_code(lang: &str, code: &str) -> String {
     let syntaxes = &*SYNTAXES;
     let syntax = syntaxes

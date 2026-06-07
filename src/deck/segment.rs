@@ -148,8 +148,6 @@ pub(super) fn xml_close(trimmed: &str, component: ComponentKind) -> bool {
     trimmed == component.close_tag()
 }
 
-/// The length of a leading run of three or more back-ticks (an opening fence),
-/// or `None` for any other line.
 pub(super) fn open_fence_len(trimmed: &str) -> Option<usize> {
     let len = trimmed.bytes().take_while(|&byte| byte == b'`').count();
     (len >= 3).then_some(len)

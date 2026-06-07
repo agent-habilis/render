@@ -6,23 +6,21 @@ use std::ops::Range;
 
 use crate::mermaid::mermaid;
 
-/// Render a Markdown document as styled terminal text, drawing any embedded
-/// ` ```mermaid ` fenced blocks inline. A block figurehead cannot draw falls
-/// back to its original code-block rendering, so this never loses content.
+/// Draws any embedded ` ```mermaid ` fenced blocks inline. A block figurehead
+/// cannot draw falls back to its original code-block rendering, so this never
+/// loses content.
 pub(crate) fn markdown(input: &str) -> String {
     markdown_to_width(input, wrap_width())
 }
 
-/// Render Markdown as styled terminal text wrapped to `width`, **without** the
-/// embedded-diagram handling of [`markdown`]. Decks use this so a ` ```mermaid `
-/// fence is just a styled code block (diagrams come from the `<mermaid>`
-/// component instead).
+/// **Without** the embedded-diagram handling of [`markdown`]: decks use this so
+/// a ` ```mermaid ` fence is just a styled code block (diagrams come from the
+/// `<mermaid>` component instead).
 pub(crate) fn markdown_plain(input: &str, width: usize) -> String {
     termimad(input, width)
 }
 
-/// Like [`markdown`] but at an explicit wrap `width`, splicing each
-/// ` ```mermaid ` block's drawn diagram in where its source was.
+/// Splices each ` ```mermaid ` block's drawn diagram in where its source was.
 fn markdown_to_width(input: &str, width: usize) -> String {
     let blocks = mermaid_blocks(input);
     if blocks.is_empty() {
@@ -68,8 +66,7 @@ fn termimad(input: &str, width: usize) -> String {
     skin.text(input, Some(width)).to_string()
 }
 
-/// Append newlines so `out` ends with a blank line (or is empty), giving a drawn
-/// diagram breathing room from the prose above it.
+/// Gives a drawn diagram breathing room from the prose above it.
 fn ensure_blank_line(out: &mut String) {
     if out.is_empty() {
         return;
@@ -82,8 +79,7 @@ fn ensure_blank_line(out: &mut String) {
     }
 }
 
-/// Byte range of each whole ` ```mermaid ` block and the source between fences,
-/// in source order. Tilde/indented fences and an unclosed fence are ignored.
+/// Tilde/indented fences and an unclosed fence are ignored.
 fn mermaid_blocks(input: &str) -> Vec<(Range<usize>, &str)> {
     let mut blocks = Vec::new();
     let mut open: Option<(usize, usize)> = None;

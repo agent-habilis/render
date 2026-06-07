@@ -25,10 +25,6 @@ const TICK: Duration = Duration::from_millis(100);
 const BLINK_MS: u128 = 500;
 
 /// Render a deck full-screen and navigate it until the user quits.
-///
-/// # Errors
-/// Fails if the document contains no slides, or on a terminal I/O error while
-/// drawing or reading input.
 pub(crate) fn run(input: &str) -> Result<()> {
     let deck = parse_deck(input)?;
     if deck.slides.is_empty() {

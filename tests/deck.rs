@@ -18,7 +18,6 @@ fn unique_nanos() -> u128 {
         .map_or(0, |dur| dur.as_nanos())
 }
 
-/// Write `contents` to a uniquely named temp file with `extension`.
 fn temp_deck(contents: &str, extension: &str) -> PathBuf {
     let name = format!("ahr-test-{}-{}.{extension}", std::process::id(), unique_nanos());
     let path = std::env::temp_dir().join(name);

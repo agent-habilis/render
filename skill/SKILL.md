@@ -1,6 +1,6 @@
 ---
 name: render
-description: Render a diagram, document, or slide deck as terminal text via the `ahr` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), and `.ah-r` presentations. Use when asked to draw, preview, or display a diagram/markdown/deck in the terminal.
+description: Render a diagram, document, table, or slide deck as terminal text via the `ahr` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), CSV/TSV tables (`.csv`/`.tsv`), and `.ah-r` presentations. Use when asked to draw, preview, or display a diagram/markdown/table/deck in the terminal.
 allowed-tools: Bash(ahr:*)
 ---
 
@@ -8,7 +8,7 @@ allowed-tools: Bash(ahr:*)
 
 Turn a file into terminal output with the `ahr` CLI — the renderer is chosen
 from the file extension. Use this when the user wants a diagram, Markdown
-document, or slide deck shown in the terminal rather than described.
+document, table, or slide deck shown in the terminal rather than described.
 
 ## Preflight
 
@@ -33,6 +33,9 @@ ahr diagram.mmd
 ahr notes.md
 ahr notes.md | less -R
 
+# Table (.csv / .tsv) — a rounded-corner grid; the first row is the header:
+ahr data.csv
+
 # A presentation (.ah-r) opens full-screen — only in an interactive terminal:
 ahr slides.ah-r
 ```
@@ -41,6 +44,8 @@ Pick the form that matches the file:
 
 - **Diagram** → `ahr <file>.mmd` (or any Markdown with a ` ```mermaid ` block).
 - **Document** → `ahr <file>.md`; pipe through `less -R` to preserve color.
+- **Table** → `ahr <file>.csv` (or `.tsv` for tab-separated); the first row is
+  styled as the header and wide cells wrap to the terminal.
 - **Deck** → `ahr <file>.ah-r` takes over the terminal (arrow keys navigate,
   `q` quits). It needs an interactive TTY; in a pipe or non-interactive shell it
   errors instead of rendering, so run it directly for the user.

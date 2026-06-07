@@ -10,6 +10,9 @@ terminal text**, choosing the renderer from the file's extension:
   blockquotes, inline code, balanced tables, width-wrapped), via
   [`termimad`](https://crates.io/crates/termimad). Embedded ` ```mermaid `
   blocks are drawn inline as diagrams.
+- **Tables** (`.csv`, `.tsv`) as a rounded-corner terminal grid — the first row
+  is the header, every row and column is separated, and cells wrap to fit the
+  terminal — via [`comfy-table`](https://crates.io/crates/comfy-table).
 - **Decks** (`.ah-r`) as a full-screen terminal presentation — Markdown slides
   with embedded code, diagrams, live shells, and animations. See
   [the deck format](docs/deck-format.md).
@@ -35,6 +38,7 @@ Sample inputs live in [`examples/`](examples/):
 ```sh
 ahr examples/flowchart-td.mmd
 ahr examples/sequence.mmd
+ahr examples/table.csv
 ```
 
 ## Build

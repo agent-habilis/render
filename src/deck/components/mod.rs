@@ -1,15 +1,8 @@
 //! The renderable pieces a slide is built from. Each component lives in its own
-//! module and owns its data, its attribute parsing, and how it renders:
-//!
-//! - [`markdown`] — a run of Markdown (the default prose).
-//! - [`code`] — a `<code>` component, statically syntax-highlighted.
-//! - [`mermaid`] — a `<mermaid>` diagram.
-//! - [`animation`] — an `<animation>` flipbook of `<frame>`s.
-//! - [`tty`] — a `<tty>` live process in a pseudo-terminal.
-//!
-//! They share the [`Component`] trait (pre-render + layout policy), the
-//! [`Cached`] render representation, and the [`measured_text`]/[`tokenize_attrs`]
-//! helpers. The deck runtime ([`crate::deck`]) dispatches to them via
+//! module and owns its data, its attribute parsing, and how it renders. They
+//! share the [`Component`] trait (pre-render + layout policy), the [`Cached`]
+//! render representation, and the [`measured_text`]/[`tokenize_attrs`] helpers.
+//! The deck runtime ([`crate::deck`]) dispatches to them via
 //! [`crate::deck::Segment`].
 
 use std::time::Duration;
@@ -49,9 +42,8 @@ pub(crate) struct FrameCtx<'frame> {
     pub(crate) blink_on: bool,
 }
 
-/// A component laid out for the current frame: its size, alignment, and (for
-/// static/animation components) the text to draw. Live components carry no text
-/// and draw themselves from [`FrameCtx`].
+/// Live components carry no text and draw themselves from [`FrameCtx`]; static
+/// and animation components carry the text to draw.
 #[derive(Debug)]
 pub(crate) struct Item {
     pub(crate) width: u16,
@@ -71,13 +63,12 @@ pub(crate) trait Component: std::fmt::Debug {
     fn render(&self, content_w: usize) -> Cached;
 
     /// Whether the component shares the left edge of the slide's text column
-    /// rather than being centered on its own. Default centered.
+    /// rather than being centered on its own.
     fn left_align(&self) -> bool {
         false
     }
 
-    /// Lay out for this frame, or `None` if there is nothing to draw. The
-    /// default handles a [`Cached::Static`] text render; live and animated
+    /// The default handles a [`Cached::Static`] text render; live and animated
     /// components override it.
     fn lay_out(&self, ctx: &FrameCtx<'_>) -> Option<Item> {
         match ctx.cached {
@@ -91,35 +82,33 @@ pub(crate) trait Component: std::fmt::Debug {
         }
     }
 
-    /// Draw the laid-out `item` into `area`. The default paints its text; live
-    /// components override it to draw from their runtime state.
+    /// The default paints its text; live components override it to draw from
+    /// their runtime state.
     fn draw(&self, frame: &mut Frame<'_>, area: Rect, item: &Item, _ctx: &FrameCtx<'_>) {
         if let Some(text) = &item.text {
             frame.render_widget(Paragraph::new(text.clone()), area);
         }
     }
 
-    /// Whether the component still needs repainting (live output, animation).
-    /// Default static; the deck runtime keeps ticking while any component is active.
+    /// Whether the component still needs repainting (live output, animation);
+    /// the deck runtime keeps ticking while any component is active.
     fn is_active(&self, _ctx: &FrameCtx<'_>) -> bool {
         false
     }
 }
 
-/// A component's render for the current slide+width, cached across repaints.
+/// Cached across repaints of the same slide+width.
 #[derive(Debug)]
 pub(crate) enum Cached {
-    /// A live `<tty>` — laid out fresh each frame, nothing cached.
+    /// Laid out fresh each frame, nothing cached.
     Live,
-    /// A static text render `(text, width, height)` (markdown / code / mermaid).
+    /// `(text, width, height)`.
     Static(Text<'static>, u16, u16),
-    /// An `<animation>`'s pre-rendered frames `(text, width, height)`.
+    /// One `(text, width, height)` per `<animation>` frame.
     Frames(Vec<(Text<'static>, u16, u16)>),
 }
 
-/// Convert a rendered (ANSI) string to a ratatui [`Text`], returning it with its
-/// measured display width and line count. Surrounding blank lines are trimmed so
-/// vertical centering is not skewed.
+/// Surrounding blank lines are trimmed so vertical centering is not skewed.
 pub(crate) fn measured_text(rendered: &str) -> (Text<'static>, u16, u16) {
     let mut lines: Vec<&str> = rendered.split('\n').collect();
     while lines.last().is_some_and(|line| line.trim().is_empty()) {
@@ -148,9 +137,9 @@ pub(crate) fn measured_text(rendered: &str) -> (Text<'static>, u16, u16) {
     )
 }
 
-/// Tokenize an attribute string into `(key, value)` pairs. A bare token (no `=`)
-/// yields `(key, None)`; `key=value` and `key="quoted value"` yield
-/// `(key, Some(value))`. Whitespace separates tokens except inside quotes.
+/// A bare token (no `=`) yields `(key, None)`; `key=value` and
+/// `key="quoted value"` yield `(key, Some(value))`. Whitespace separates tokens
+/// except inside quotes.
 pub(crate) fn tokenize_attrs(attrs: &str) -> Vec<(String, Option<String>)> {
     let mut out = Vec::new();
     let chars: Vec<char> = attrs.chars().collect();
@@ -168,16 +157,16 @@ pub(crate) fn tokenize_attrs(attrs: &str) -> Vec<(String, Option<String>)> {
         let key: String = chars[key_start..idx].iter().collect();
 
         if idx < chars.len() && chars[idx] == '=' {
-            idx += 1; // consume '='
+            idx += 1;
             let value = if idx < chars.len() && chars[idx] == '"' {
-                idx += 1; // consume opening quote
+                idx += 1;
                 let val_start = idx;
                 while idx < chars.len() && chars[idx] != '"' {
                     idx += 1;
                 }
                 let value: String = chars[val_start..idx].iter().collect();
                 if idx < chars.len() {
-                    idx += 1; // consume closing quote
+                    idx += 1;
                 }
                 value
             } else {

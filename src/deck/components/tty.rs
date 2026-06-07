@@ -54,23 +54,17 @@ pub(crate) struct TtyComponent {
     /// Spawn at deck load (not first view) and keep alive for the whole session.
     /// Takes precedence over `persist`/`id`: keyed by position, not shared.
     pub(crate) prerender: bool,
-    /// Box title; falls back to the command's first token.
     pub(crate) title: Option<String>,
-    /// Fixed status text; falls back to the live process status.
     pub(crate) status: Option<String>,
-    /// Box interior, in cells; a default is used when absent.
     pub(crate) rows: Option<u16>,
     pub(crate) cols: Option<u16>,
-    /// Keystrokes fed into the process after it starts (raw, with
-    /// `\r`/`\n`/`\t`/`\e`/`\\` escapes), to drive a TUI. Decoded by
-    /// [`decode_keys`].
+    /// Raw keystrokes (with `\r`/`\n`/`\t`/`\e`/`\\` escapes) fed in after start
+    /// to drive a TUI; decoded by [`decode_keys`].
     pub(crate) keys: Option<String>,
     pub(crate) command: String,
 }
 
 impl TtyComponent {
-    /// Parse a `<tty>` component's attributes. Attributes are whitespace-separated
-    /// `key="value"` pairs or bare flags (e.g. `persist`); unknown keys ignored.
     pub(crate) fn parse(attrs: &str, command: String) -> Self {
         let mut component = Self {
             command,
@@ -92,8 +86,6 @@ impl TtyComponent {
         component
     }
 
-    /// The box title: the `title` override, else the command's first token, else
-    /// `"tty"`.
     pub(crate) fn display_title(&self) -> &str {
         if let Some(title) = &self.title {
             return title;
@@ -140,10 +132,8 @@ impl super::Component for TtyComponent {
     }
 }
 
-/// Default box interior when a component sets no `rows=`/`cols=`.
 const DEFAULT_ROWS: u16 = 10;
 const DEFAULT_COLS: u16 = 80;
-/// Lines of scrollback the emulator keeps; the box shows the bottom of it.
 const SCROLLBACK: usize = 1000;
 
 /// Cumulative delays (ms) at which a component's `keys=` are (re)sent into the PTY.
@@ -151,30 +141,24 @@ const SCROLLBACK: usize = 1000;
 /// too, not just whatever is on screen the instant the process spawns.
 const KEYS_DELAYS: &[u64] = &[250, 300, 350, 450, 600, 600];
 
-/// A single running (or finished) `tty` process and its emulator screen.
 pub(crate) struct ManagedProc {
-    /// The vt100 emulator, fed by the reader thread; locked to read the screen.
+    /// Fed by the reader thread; locked to read the screen for rendering.
     parser: Arc<Mutex<vt100::Parser>>,
-    /// The PTY master, kept for resizing as the box size changes.
+    /// Kept for resizing as the box size changes.
     master: Box<dyn MasterPty + Send>,
-    /// The child, kept for status polling and for `kill` on drop.
+    /// Kept for status polling and for `kill` on drop.
     child: Box<dyn Child + Send + Sync>,
     started: Instant,
-    /// When the child exited (frozen elapsed time), once observed.
+    /// Frozen elapsed time, set once the exit is observed.
     ended: Option<Instant>,
-    /// The exit status, once the child has finished.
     status: Option<portable_pty::ExitStatus>,
     rows: u16,
     cols: u16,
-    /// The reader thread; detached — it ends on EOF when the child dies.
+    /// Detached; ends on EOF when the child dies.
     _reader: JoinHandle<()>,
 }
 
 impl ManagedProc {
-    /// Spawn `command` (via `$SHELL -lc`) in a `rows`x`cols` PTY and start
-    /// streaming its output into a fresh emulator screen. When `keys` is set,
-    /// those bytes are fed into the PTY across the startup window (see
-    /// [`KEYS_DELAYS`]).
     fn spawn(command: &str, keys: Option<&[u8]>, rows: u16, cols: u16) -> Result<Self> {
         let size = PtySize {
             rows,
@@ -251,7 +235,6 @@ impl ManagedProc {
         })
     }
 
-    /// Lock the emulator so the caller can read its screen for rendering.
     pub(crate) fn lock_parser(&self) -> MutexGuard<'_, vt100::Parser> {
         // A panicked reader thread is the only poisoning source; recover the
         // grid anyway so a dead component still renders its last frame.
@@ -260,7 +243,7 @@ impl ManagedProc {
             .unwrap_or_else(std::sync::PoisonError::into_inner)
     }
 
-    /// Note the child's exit (once), freezing the elapsed time and status.
+    /// Idempotent: freezes the elapsed time and status at the first observed exit.
     fn poll(&mut self) {
         if self.status.is_some() {
             return;
@@ -271,7 +254,6 @@ impl ManagedProc {
         }
     }
 
-    /// Resize the PTY and emulator to a new box interior, if it changed.
     fn resize(&mut self, rows: u16, cols: u16) {
         if rows == self.rows && cols == self.cols {
             return;
@@ -287,23 +269,19 @@ impl ManagedProc {
         self.cols = cols;
     }
 
-    /// Whether the child is still running.
     pub(crate) fn is_running(&self) -> bool {
         self.status.is_none()
     }
 
-    /// The current box interior size `(rows, cols)` the PTY/emulator is set to.
     pub(crate) fn interior(&self) -> (u16, u16) {
         (self.rows, self.cols)
     }
 
-    /// Wall-clock time since spawn (frozen at exit).
+    /// Frozen at exit.
     fn elapsed(&self) -> Duration {
         self.ended.unwrap_or_else(Instant::now) - self.started
     }
 
-    /// The default status-bar text: a (blink-toggled) running indicator with
-    /// elapsed time, or the exit mark and code once finished.
     pub(crate) fn status_line(&self, blink_on: bool) -> String {
         let secs = self.elapsed().as_secs();
         let clock = format!("{:02}:{:02}", secs / 60, secs % 60);
@@ -349,8 +327,8 @@ impl Drop for ManagedProc {
     }
 }
 
-/// Build the [`CommandBuilder`] that runs `command` through the user's login
-/// shell (so aliases, `PATH`, and `$HOME` are as in their terminal).
+/// Runs through the user's login shell so aliases, `PATH`, and `$HOME` match
+/// their terminal.
 fn shell_command(command: &str) -> CommandBuilder {
     let shell = std::env::var("SHELL").unwrap_or_else(|_| "/bin/sh".to_owned());
     let mut cmd = CommandBuilder::new(shell);
@@ -359,9 +337,8 @@ fn shell_command(command: &str) -> CommandBuilder {
     cmd
 }
 
-/// Decode a `keys=` attribute into the bytes to send: C-style escapes `\r`,
-/// `\n`, `\t`, `\e` (escape, `0x1b`), and `\\` are interpreted; any other `\x`
-/// is left as the literal two characters, and a trailing lone `\` is kept.
+/// Interprets `\r`/`\n`/`\t`/`\e` (`0x1b`)/`\\`. Any other `\x` is kept as its
+/// two literal characters, and a trailing lone `\` is kept.
 fn decode_keys(raw: &str) -> Vec<u8> {
     let mut out = Vec::with_capacity(raw.len());
     let mut chars = raw.chars();
@@ -391,12 +368,11 @@ fn decode_keys(raw: &str) -> Vec<u8> {
 /// Owns every running process and applies the per-slide lifecycle.
 #[derive(Debug, Default)]
 pub(crate) struct ProcessManager {
-    /// Ephemeral `tty` processes, keyed by `(slide index, component index)`.
+    /// Keyed by `(slide index, component index)`.
     ephemeral: HashMap<(usize, usize), ManagedProc>,
-    /// Persistent `tty` processes, keyed by their `id`.
+    /// Keyed by `id`.
     persistent: HashMap<String, ManagedProc>,
-    /// Prerendered `tty` processes, keyed by `(slide index, component index)`;
-    /// spawned at deck load and kept for the whole session.
+    /// Keyed by `(slide index, component index)`.
     prerendered: HashMap<(usize, usize), ManagedProc>,
 }
 
@@ -417,9 +393,7 @@ impl ProcessManager {
         self.ephemeral.retain(|(slide, _), _| *slide == current);
     }
 
-    /// Ensure every `tty` component on slide `current` has a process, sized to fit
-    /// the `content_rows`x`content_cols` content area minus the box border,
-    /// spawning the missing ones and resizing/polling the rest.
+    /// Spawn the missing processes for slide `current` and resize/poll the rest.
     pub(crate) fn ensure(
         &mut self,
         current: usize,
@@ -471,10 +445,9 @@ impl ProcessManager {
         }
     }
 
-    /// Spawn the `prerender` process for one `tty` component at deck load, sized to
-    /// an estimate of its eventual box (resized exactly by [`Self::ensure`] when
-    /// the slide is shown). A no-op once the process exists; a failed spawn is
-    /// simply retried by [`Self::ensure`] on arrival.
+    /// Spawn one `prerender` process at deck load, sized to an estimate of its
+    /// eventual box. A no-op once it exists; a failed spawn is retried by
+    /// [`Self::ensure`] on arrival.
     pub(crate) fn prerender(
         &mut self,
         slide: usize,
@@ -499,7 +472,6 @@ impl ProcessManager {
         }
     }
 
-    /// The process backing a `tty` component on slide `current`, if it spawned.
     pub(crate) fn proc_for(
         &self,
         current: usize,
@@ -517,9 +489,6 @@ impl ProcessManager {
 
 }
 
-/// Draw a `<tty>` box: a bordered [`Block`] (title on top, status bar on the
-/// bottom) wrapping the process's live emulator screen, or a placeholder if the
-/// process failed to start.
 pub(crate) fn draw_tty(
     frame: &mut Frame<'_>,
     area: Rect,
@@ -545,8 +514,8 @@ pub(crate) fn draw_tty(
     }
 }
 
-/// The box interior for a component: its `rows=`/`cols=` (or defaults), each clamped
-/// to the space available and at least 1.
+/// `rows=`/`cols=` (or defaults), each clamped to the space available and at
+/// least 1.
 pub(crate) fn box_interior(component: &TtyComponent, max_rows: u16, max_cols: u16) -> (u16, u16) {
     let rows = component
         .rows
@@ -561,8 +530,8 @@ pub(crate) fn box_interior(component: &TtyComponent, max_rows: u16, max_cols: u1
     (rows, cols)
 }
 
-/// The persistence key for a component: `Some(id)` only when it both `persist`s and
-/// carries an `id` (the link required to survive a slide change).
+/// `Some(id)` only when the component both `persist`s and carries an `id` — the
+/// link required to survive a slide change.
 fn persistent_id(component: &TtyComponent) -> Option<&str> {
     if component.persist {
         component.id.as_deref()

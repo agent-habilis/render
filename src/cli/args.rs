@@ -14,12 +14,12 @@ use super::setup::Agent;
     version,
     arg_required_else_help = true,
     args_conflicts_with_subcommands = true,
-    after_help = "the file extension selects the renderer — e.g. `ahr diagram.mmd`\n`.ah-r` opens a full-screen presentation (arrow keys navigate, q quits)\n\na tool by agent-habilis █🫈"
+    after_help = "a tool by agent-habilis █🫈"
 )]
 pub(crate) struct Cli {
     /// Path to the input file. The extension selects the renderer:
     /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown,
-    /// `.ah-r` → full-screen presentation.
+    /// `.csv`/`.tsv` → table, `.ah-r` → full-screen presentation.
     pub(super) path: Option<PathBuf>,
     #[command(subcommand)]
     pub(super) command: Option<Command>,
