@@ -22,7 +22,7 @@ Use the **arrow keys** to move between slides, `q` to quit.
 
 <mermaid>
 flowchart LR
-    A[Write .ah-r] --> B[ahr deck.ah-r]
+    A[Write .ah-r] --> B[ah-r deck.ah-r]
     B --> C{Present}
     C --> D[Arrow keys]
     C --> E[q to quit]
@@ -81,4 +81,4 @@ No `id`, so this one is killed when you leave — and restarts if you return.
 
 # Thanks
 
-Made with `ahr` by agent-habilis.
+Made with `ah-r` by agent-habilis.

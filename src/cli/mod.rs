@@ -1,5 +1,5 @@
-//! The `ahr` command-line interface: the argument shape ([`args`]) and the
-//! [`run_cli`] entry point. With no subcommand `ahr` reads the file given as its
+//! The `ah-r` command-line interface: the argument shape ([`args`]) and the
+//! [`run_cli`] entry point. With no subcommand `ah-r` reads the file given as its
 //! positional argument and writes the rendered text to stdout (the extension
 //! selects the renderer); the `setup`/`teardown` subcommands manage the embedded
 //! `/render` agent skill (see [`setup`]).
@@ -110,7 +110,7 @@ fn render_file(path: &Path) -> Result<()> {
 
     match write {
         Ok(()) => Ok(()),
-        // A reader closing the pipe early (`ahr … | head`) is a clean end for a
+        // A reader closing the pipe early (`ah-r … | head`) is a clean end for a
         // filter; Rust ignores SIGPIPE, so EPIPE surfaces here instead.
         Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
         Err(err) => Err(anyhow::anyhow!("failed to write stdout: {err}")),

@@ -1,4 +1,4 @@
-//! `ahr setup` / `ahr teardown`: install or remove the `/render` agent skill
+//! `ah-r setup` / `ah-r teardown`: install or remove the `/render` agent skill
 //! across agents. The skill's `SKILL.md` is embedded at compile time, so a
 //! brew/cargo-installed binary carries it with no repo checkout. Both commands
 //! are dry-run by default; `--execute` mutates. Agent selection is flag-driven
@@ -183,7 +183,7 @@ fn home_dir() -> Result<PathBuf> {
 }
 
 /// `console` strips the color when stderr isn't a terminal, so piped/captured
-/// output (an agent running `ahr setup`) stays clean.
+/// output (an agent running `ah-r setup`) stays clean.
 fn status(verb: &str, msg: &str) {
     eprintln!("{} {msg}", style(format!("{verb:>12}")).green().bold());
 }
@@ -201,7 +201,7 @@ mod tests {
     fn embedded_skill_has_render_frontmatter() {
         assert!(SKILL.starts_with("---"));
         assert!(SKILL.contains("name: render"));
-        assert!(SKILL.contains("allowed-tools: Bash(ahr:*)"));
+        assert!(SKILL.contains("allowed-tools: Bash(ah-r:*)"));
     }
 
     #[test]

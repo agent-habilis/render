@@ -1,4 +1,4 @@
-//! The clap-derived argument shape for the `ahr` command.
+//! The clap-derived argument shape for the `ah-r` command.
 
 use std::path::PathBuf;
 
@@ -9,7 +9,7 @@ use super::setup::Agent;
 /// Render a diagram or document file as terminal text.
 #[derive(Parser, Debug)]
 #[command(
-    name = "ahr",
+    name = "ah-r",
     about = "render diagrams and documents as terminal text",
     version,
     arg_required_else_help = true,

@@ -1,16 +1,16 @@
 # The `.ah-r` deck format
 
-An `.ah-r` deck is a **Markdown file with embedded XML islands**. `ahr` renders
+An `.ah-r` deck is a **Markdown file with embedded XML islands**. `ah-r` renders
 it as a full-screen terminal presentation: each slide is a vertically-centered
 stack of Markdown prose and embedded components (code, diagrams, live shells,
 animations).
 
 ```sh
-ahr slides.ah-r
+ah-r slides.ah-r
 ```
 
 A deck takes over the terminal, so it needs an **interactive TTY** on both
-stdin and stdout — in a pipe or redirect `ahr` errors instead of rendering.
+stdin and stdout — in a pipe or redirect `ah-r` errors instead of rendering.
 Navigate with the arrow keys; press `q` to quit.
 
 | Action | Keys |
@@ -161,7 +161,7 @@ Some **Markdown**, then a diagram:
 
 <mermaid>
 flowchart LR
-  idea --> ahr --> terminal
+  idea --> render[ah-r] --> terminal
 </mermaid>
 
 ---

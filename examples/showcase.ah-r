@@ -16,7 +16,7 @@ Arrow keys to navigate, `q` to quit.
 An untagged fence renders as a styled (non-highlighted) block:
 
 ```
-$ ahr showcase.ah-r
+$ ah-r showcase.ah-r
 rendering 11 slides…
 ```
 
@@ -143,4 +143,4 @@ console.log(present(slides));
 
 # Thanks
 
-Made with `ahr` by agent-habilis.
+Made with `ah-r` by agent-habilis.

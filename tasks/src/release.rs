@@ -27,6 +27,6 @@ pub(crate) fn run(sh: &Shell, args: &[String]) -> TaskOutcome {
     }
     eprintln!("=> Building release binary...");
     cmd!(sh, "cargo build --release").quiet().run()?;
-    eprintln!("=> Binary: target/release/ahr");
+    eprintln!("=> Binary: target/release/ah-r");
     Ok(())
 }

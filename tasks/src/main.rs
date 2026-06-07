@@ -38,7 +38,7 @@ enum Task {
     Ci,
     /// Remove build artifacts.
     Clean,
-    /// Install the `ahr` binary.
+    /// Install the `ah-r` binary.
     Install,
     /// Build the release binary. With a level (`patch`|`minor`|`major`|
     /// `x.y.z`, plus flags like `--execute`) drive cargo-release; dry run by
@@ -47,13 +47,13 @@ enum Task {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Install the `/render` agent skill (forwards to `ahr setup`; dry run
+    /// Install the `/render` agent skill (forwards to `ah-r setup`; dry run
     /// unless `--execute`). Pass flags after `--`, e.g. `-- --execute`.
     Setup {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
-    /// Remove the `/render` agent skill (forwards to `ahr teardown`; dry run
+    /// Remove the `/render` agent skill (forwards to `ah-r teardown`; dry run
     /// unless `--execute`).
     Teardown {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]

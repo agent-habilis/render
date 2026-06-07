@@ -1,4 +1,4 @@
-//! End-to-end tests for the `.ah-r` presentation format, driving the real `ahr`
+//! End-to-end tests for the `.ah-r` presentation format, driving the real `ah-r`
 //! binary. A deck only runs in an interactive terminal, so the rendering path is
 //! exercised through a pseudo-terminal.
 
@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
-const AHR: &str = env!("CARGO_BIN_EXE_ahr");
+const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
 
 fn unique_nanos() -> u128 {
     std::time::SystemTime::now()
@@ -19,7 +19,7 @@ fn unique_nanos() -> u128 {
 }
 
 fn temp_deck(contents: &str, extension: &str) -> PathBuf {
-    let name = format!("ahr-test-{}-{}.{extension}", std::process::id(), unique_nanos());
+    let name = format!("ah-r-test-{}-{}.{extension}", std::process::id(), unique_nanos());
     let path = std::env::temp_dir().join(name);
     std::fs::write(&path, contents).expect("write temp deck");
     path
@@ -28,7 +28,7 @@ fn temp_deck(contents: &str, extension: &str) -> PathBuf {
 #[test]
 fn deck_outside_a_terminal_is_rejected() {
     let path = temp_deck("# One\n\n---\n\n# Two\n", "ah-r");
-    let output = Command::new(AHR).arg(&path).output().expect("run ahr");
+    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
     let _ = std::fs::remove_file(&path);
 
     assert!(!output.status.success(), "a piped deck (no tty) must fail");
@@ -42,7 +42,7 @@ fn deck_outside_a_terminal_is_rejected() {
 #[test]
 fn unsupported_extension_is_rejected() {
     let path = temp_deck("# not a deck\n", "txt");
-    let output = Command::new(AHR).arg(&path).output().expect("run ahr");
+    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
     let _ = std::fs::remove_file(&path);
 
     assert!(!output.status.success());
@@ -63,10 +63,10 @@ fn deck_renders_slides_and_quits_in_a_pty() {
         })
         .expect("open pty");
 
-    let mut cmd = CommandBuilder::new(AHR);
+    let mut cmd = CommandBuilder::new(AH_R);
     cmd.arg(&path);
     cmd.env("TERM", "xterm-256color");
-    let mut child = pair.slave.spawn_command(cmd).expect("spawn ahr");
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn ah-r");
     drop(pair.slave);
 
     let output = Arc::new(Mutex::new(Vec::new()));
@@ -98,7 +98,7 @@ fn deck_renders_slides_and_quits_in_a_pty() {
         let _ = killer.kill();
     });
 
-    let status = child.wait().expect("wait for ahr");
+    let status = child.wait().expect("wait for ah-r");
     drop(pair.master);
     reader_thread.join().expect("join reader");
     let _ = watchdog.join();

@@ -1,11 +1,11 @@
-//! End-to-end tests for the `.csv`/`.tsv` table format, driving the real `ahr`
+//! End-to-end tests for the `.csv`/`.tsv` table format, driving the real `ah-r`
 //! binary. These run with stdout captured (not a TTY), so the renderer uses its
 //! deterministic 80-column, no-ANSI path.
 
 use std::path::PathBuf;
 use std::process::Command;
 
-const AHR: &str = env!("CARGO_BIN_EXE_ahr");
+const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
 
 fn unique_nanos() -> u128 {
     std::time::SystemTime::now()
@@ -14,7 +14,7 @@ fn unique_nanos() -> u128 {
 }
 
 fn temp_file(contents: &str, extension: &str) -> PathBuf {
-    let name = format!("ahr-table-{}-{}.{extension}", std::process::id(), unique_nanos());
+    let name = format!("ah-r-table-{}-{}.{extension}", std::process::id(), unique_nanos());
     let path = std::env::temp_dir().join(name);
     std::fs::write(&path, contents).expect("write temp file");
     path
@@ -22,11 +22,11 @@ fn temp_file(contents: &str, extension: &str) -> PathBuf {
 
 fn render(contents: &str, extension: &str) -> String {
     let path = temp_file(contents, extension);
-    let output = Command::new(AHR).arg(&path).output().expect("run ahr");
+    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
     let _ = std::fs::remove_file(&path);
     assert!(
         output.status.success(),
-        "ahr failed: {}",
+        "ah-r failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).expect("utf8 stdout")

@@ -1,7 +1,7 @@
 # Design Doc with an Embedded Diagram
 
 Markdown often embeds Mermaid diagrams in a fenced ` ```mermaid ` block.
-This file is **Markdown**, so `ahr` renders the prose with termimad and
+This file is **Markdown**, so `ah-r` renders the prose with termimad and
 **draws the diagram below inline** with figurehead.
 
 ## Request flow

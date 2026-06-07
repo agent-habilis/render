@@ -5,9 +5,9 @@ use xshell::{Shell, cmd};
 use crate::TaskOutcome;
 
 pub(crate) fn run(sh: &Shell) -> TaskOutcome {
-    eprintln!("=> Installing ahr...");
+    eprintln!("=> Installing ah-r...");
     // Anchor `--path` at the repo root (parent of this `tasks/` crate),
-    // computed at compile time, so the task installs `ahr` no matter which
+    // computed at compile time, so the task installs `ah-r` no matter which
     // directory it is invoked from — not whatever crate happens to be in the
     // caller's cwd.
     let root: PathBuf = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -21,6 +21,6 @@ pub(crate) fn run(sh: &Shell) -> TaskOutcome {
     cmd!(sh, "cargo install --path {root} --force")
         .quiet()
         .run()?;
-    eprintln!("=> Installed to ~/.cargo/bin/ahr");
+    eprintln!("=> Installed to ~/.cargo/bin/ah-r");
     Ok(())
 }

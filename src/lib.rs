@@ -1,6 +1,6 @@
 //! `agent-habilis-render` — render an input file as terminal text.
 //!
-//! This crate ships as **both** a binary (the `ahr` CLI) and a library. The
+//! This crate ships as **both** a binary (the `ah-r` CLI) and a library. The
 //! binary is a thin shim over [`run_cli`]. It reads the input file given as
 //! its argument and selects a renderer from the extension: Mermaid diagrams via
 //! the [`figurehead`] crate (`.mmd`/`.mermaid`), Markdown via [`termimad`]

@@ -1,6 +1,6 @@
 # Render Markdown in the Terminal
 
-`ahr` reads Markdown on stdin and prints a **styled** terminal view using
+`ah-r` reads Markdown on stdin and prints a **styled** terminal view using
 [termimad](https://crates.io/crates/termimad).
 
 ## Text formatting
