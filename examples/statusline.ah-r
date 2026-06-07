@@ -1,4 +1,4 @@
-<deck title="[38;2;130;170;255m[0m[48;2;130;170;255m[38;2;27;29;43m lorem ipsum [0m[38;2;130;170;255m[0m" />
+<deck title="[38;2;130;170;255m[0m[48;2;130;170;255m[38;2;27;29;43m lorem ipsum [0m[38;2;130;170;255m[0m" pagination="[38;2;195;232;141m[0m[48;2;195;232;141m[38;2;27;29;43m {cur}/{total} [0m[38;2;195;232;141m[0m" />
 
 # Pill statusline
 
@@ -7,8 +7,6 @@ pill — Nerd Font powerline caps wrapping an ANSI-colored label — straight fr
 the frontmatter. Look at the bottom-left corner.
 
 ---
-
-<slide title="[38;2;130;170;255m[0m[48;2;130;170;255m[38;2;27;29;43m lorem ipsum slide [0m[38;2;130;170;255m[0m" />
 
 ## Flexible titles
 

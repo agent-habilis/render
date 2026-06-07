@@ -7,8 +7,6 @@ every `seconds`, optionally `loop`ing.
 
 ---
 
-<slide title="Spinner" />
-
 ## A looping spinner
 
 <animation seconds="0.12" loop>
@@ -30,8 +28,6 @@ every `seconds`, optionally `loop`ing.
 
 ---
 
-<slide title="Cat" />
-
 ## Same width, blinks in place
 
 <animation seconds="0.4" loop>
@@ -48,8 +44,6 @@ every `seconds`, optionally `loop`ing.
 </animation>
 
 ---
-
-<slide title="Countdown" />
 
 ## Plays once, holds the last frame
 

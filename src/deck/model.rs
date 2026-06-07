@@ -1,8 +1,8 @@
 //! Parse an `.ah-r` file into a [`Deck`] of [`Slide`]s.
 //!
 //! A deck is a Markdown file with embedded XML islands. Standalone `---` lines
-//! separate slides; a `<deck title="…" />` / `<slide title="…" />` self-closing
-//! tag at the start of a slide carries frontmatter. The XML components —
+//! separate slides; a `<deck title="…" pagination="…" />` self-closing tag (deck
+//! level, anywhere a slide may start) carries frontmatter. The XML components —
 //! `<code>`, `<tty>`, `<mermaid>`, `<animation>` — express what Markdown cannot;
 //! see [`Segment`].
 //!
@@ -19,34 +19,23 @@ use super::segment::{
 #[derive(Debug, Default)]
 pub(crate) struct Deck {
     pub(crate) title: Option<String>,
+    /// Footer page-indicator template (`{cur}`/`{total}`); `None` ⇒ the default
+    /// `current/total`.
+    pub(crate) pagination: Option<String>,
     pub(crate) slides: Vec<Slide>,
 }
 
-/// A per-slide `title` overrides the deck title in the footer.
 #[derive(Debug, Default, PartialEq, Eq)]
 pub(crate) struct Slide {
-    pub(crate) title: Option<String>,
     pub(crate) body: String,
 }
 
 impl Slide {
-    pub(crate) fn footer_title<'deck>(&'deck self, deck: &'deck Deck) -> Option<&'deck str> {
-        self.title.as_deref().or(deck.title.as_deref())
-    }
-
     /// A slide with no component yields a single [`Segment::Markdown`] holding
     /// the whole body.
     pub(crate) fn segments(&self) -> Vec<Segment> {
         split_segments(&self.body)
     }
-}
-
-#[derive(Debug, Clone, Copy)]
-enum MetaKind {
-    /// Applies to the whole deck.
-    Deck,
-    /// Applies to the current slide.
-    Slide,
 }
 
 /// A malformed or empty document yields the slides it can (possibly none — the
@@ -58,20 +47,13 @@ pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
     for section in split_slides(input) {
         let (meta_tags, body) = strip_meta_tags(&section);
 
-        let mut slide_title = None;
-        for (kind, title) in meta_tags {
-            match kind {
-                MetaKind::Deck => {
-                    deck_tags += 1;
-                    if title.is_some() {
-                        deck.title = title;
-                    }
-                }
-                MetaKind::Slide => {
-                    if title.is_some() {
-                        slide_title = title;
-                    }
-                }
+        for meta in meta_tags {
+            deck_tags += 1;
+            if meta.title.is_some() {
+                deck.title = meta.title;
+            }
+            if meta.pagination.is_some() {
+                deck.pagination = meta.pagination;
             }
         }
 
@@ -82,7 +64,6 @@ pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
             continue;
         }
         deck.slides.push(Slide {
-            title: slide_title,
             body: body.to_owned(),
         });
     }
@@ -141,9 +122,15 @@ fn split_slides(input: &str) -> Vec<String> {
     sections
 }
 
+/// `<deck>` frontmatter parsed from one tag line.
+struct DeckMeta {
+    title: Option<String>,
+    pagination: Option<String>,
+}
+
 /// Only tags at the very start (after blank lines) are treated as metadata; a
 /// `<deck/>` later in the slide is ordinary Markdown. Each tag is a single line.
-fn strip_meta_tags(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
+fn strip_meta_tags(section: &str) -> (Vec<DeckMeta>, String) {
     let lines: Vec<&str> = section.lines().collect();
     let mut pos = 0;
     let mut tags = Vec::new();
@@ -162,17 +149,11 @@ fn strip_meta_tags(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
     (tags, lines[pos..].join("\n"))
 }
 
-/// The name must be followed by whitespace or the tag's end, and the tag must
-/// close with `>` (the `/` is tolerated but optional); other attributes ignored.
-fn meta_tag(trimmed: &str) -> Option<(MetaKind, Option<String>)> {
-    let rest = trimmed.strip_prefix('<')?;
-    let (kind, after) = if let Some(after) = rest.strip_prefix("deck") {
-        (MetaKind::Deck, after)
-    } else if let Some(after) = rest.strip_prefix("slide") {
-        (MetaKind::Slide, after)
-    } else {
-        return None;
-    };
+/// Parse a `<deck …/>` frontmatter line. The name must be followed by whitespace
+/// or the tag's end, and the tag must close with `>` (the `/` is tolerated but
+/// optional); unknown attributes are ignored.
+fn meta_tag(trimmed: &str) -> Option<DeckMeta> {
+    let after = trimmed.strip_prefix('<')?.strip_prefix("deck")?;
     // The name must end here (a boundary), so `<deckx/>` is not read as `deck`.
     if !(after.starts_with(char::is_whitespace) || after.starts_with('/') || after.starts_with('>'))
     {
@@ -180,11 +161,17 @@ fn meta_tag(trimmed: &str) -> Option<(MetaKind, Option<String>)> {
     }
     let inner = after.trim_end().strip_suffix('>')?;
     let attrs = inner.strip_suffix('/').unwrap_or(inner);
-    let title = tokenize_attrs(attrs)
-        .into_iter()
-        .find(|(key, _)| key == "title")
-        .and_then(|(_, value)| value);
-    Some((kind, title))
+    let tokens = tokenize_attrs(attrs);
+    let attr = |name: &str| {
+        tokens
+            .iter()
+            .find(|(key, _)| key == name)
+            .and_then(|(_, value)| value.clone())
+    };
+    Some(DeckMeta {
+        title: attr("title"),
+        pagination: attr("pagination"),
+    })
 }
 
 #[cfg(test)]
@@ -258,13 +245,21 @@ mod tests {
     }
 
     #[test]
-    fn per_slide_title_overrides_deck_title() {
-        let input = "<deck title=\"Deck\" />\n\n# First\n\n---\n\n<slide title=\"Second Page\" />\n\n# Second";
+    fn deck_title_applies_to_all_slides_and_slide_tag_is_plain_body() {
+        let input = "<deck title=\"Deck\" />\n\n# First\n\n---\n\n<slide title=\"Second\" />\n\n# Second";
         let deck = parse_deck(input).unwrap();
+        assert_eq!(deck.title.as_deref(), Some("Deck"));
         assert_eq!(deck.slides.len(), 2);
-        assert_eq!(deck.slides[0].footer_title(&deck), Some("Deck"));
-        assert_eq!(deck.slides[1].footer_title(&deck), Some("Second Page"));
-        assert_eq!(deck.slides[1].body, "# Second");
+        assert_eq!(deck.slides[0].body, "# First");
+        // `<slide>` is no longer part of the format, so the line is ordinary body.
+        assert_eq!(deck.slides[1].body, "<slide title=\"Second\" />\n\n# Second");
+    }
+
+    #[test]
+    fn reads_deck_pagination_template() {
+        let deck = parse_deck("<deck pagination=\" {cur}/{total} \" />\n\n# Slide").unwrap();
+        assert_eq!(deck.pagination.as_deref(), Some(" {cur}/{total} "));
+        assert!(parse_deck("# Slide").unwrap().pagination.is_none());
     }
 
     #[test]
@@ -273,7 +268,6 @@ mod tests {
         assert_eq!(deck.title.as_deref(), Some("T"));
         assert_eq!(deck.slides.len(), 1);
         assert_eq!(deck.slides[0].body, "# Slide");
-        assert_eq!(deck.slides[0].footer_title(&deck), Some("T"));
     }
 
     #[test]
@@ -295,9 +289,9 @@ mod tests {
     }
 
     #[test]
-    fn slide_without_title_falls_back_to_none() {
+    fn deck_without_title_is_none() {
         let deck = parse_deck("# Slide").unwrap();
-        assert_eq!(deck.slides[0].footer_title(&deck), None);
+        assert!(deck.title.is_none());
     }
 
     #[test]

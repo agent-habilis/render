@@ -10,8 +10,6 @@ Arrow keys to navigate, `q` to quit.
 
 ---
 
-<slide title="Static highlight" />
-
 ## The same file, highlighted statically
 
 A `<code>` block renders instantly with Tokyo Night colors — no process, no
@@ -26,8 +24,6 @@ Compare it with the next slide, where the very same file is drawn by your
 **actual** nvim.
 
 ---
-
-<slide title="init.lua" />
 
 ## `~/.config/nvim/init.lua`, rendered by nvim itself
 

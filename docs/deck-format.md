@@ -38,30 +38,32 @@ content, not a separator. A deck must contain at least one slide.
 
 ## Frontmatter
 
-Optional metadata is a self-closing tag at the **start** of a slide (after any
-blank lines). Only the `title` attribute is read; any others are ignored.
+Optional metadata is a self-closing `<deck>` tag at the **start** of a slide
+(after any blank lines); unknown attributes are ignored.
 
-- `<deck title="…" />` — deck-level. Place it at the top of the file; its
-  `title` is the default footer title for every slide. A `<deck>` with no slide
-  body of its own is metadata only, not a slide. **At most one `<deck>` per
-  document** — a second one is an error.
-- `<slide title="…" />` — per-slide. Overrides the deck title in that slide's
-  footer.
+- `<deck title="…" />` — the footer title, shown on every slide. A `<deck>` with
+  no slide body of its own is metadata only, not a slide. **At most one `<deck>`
+  per document** — a second one is an error.
+- `pagination="…"` — a template for the footer's page indicator. `{cur}` and
+  `{total}` expand to the current page (1-based) and the slide count; `{{`/`}}`
+  are literal braces. Omit it for the default `current/total`.
+
+Both `title` and `pagination` are rendered **as-is**, so they can carry ANSI
+colors and Nerd Font glyphs — e.g. a powerline pill (see `statusline.ah-r` and
+`typography.ah-r`).
 
 ```text
-<deck title="My Talk" />
+<deck title="My Talk" pagination=" {cur}/{total} " />
 
 # Intro
 
 ---
 
-<slide title="Details" />
-
 # The details
 ```
 
-The footer shows the active title as a powerline-style pill on the left and
-`current/total` on the right (no rule line above it).
+The footer shows the title on the left and the page indicator on the right (no
+rule line above it).
 
 ## Default content: Markdown
 

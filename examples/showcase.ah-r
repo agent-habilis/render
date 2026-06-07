@@ -9,8 +9,6 @@ Arrow keys to navigate, `q` to quit.
 
 ---
 
-<slide title="Plain code block" />
-
 ## A plain code block
 
 An untagged fence renders as a styled (non-highlighted) block:
@@ -22,8 +20,6 @@ rendering 11 slides…
 
 ---
 
-<slide title="Live shell" />
-
 ## A live code block
 
 A `<tty>` element runs a real command, streaming its output live:
@@ -33,8 +29,6 @@ while :; do date "+%H:%M:%S"; sleep 1; done
 </tty>
 
 ---
-
-<slide title="Live counter" />
 
 ## A persistent live block
 
@@ -46,8 +40,6 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 
 ---
 
-<slide title="Same counter, kept alive" />
-
 ## The same process, one slide later
 
 It was **not** restarted — same `id`, so it kept counting:
@@ -57,8 +49,6 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 </tty>
 
 ---
-
-<slide title="Rust" />
 
 ## Rust, syntax highlighted
 
@@ -76,8 +66,6 @@ fn main() {
 
 ---
 
-<slide title="HTML" />
-
 ## HTML, syntax highlighted
 
 <code lang="html">
@@ -93,8 +81,6 @@ fn main() {
 
 ---
 
-<slide title="JavaScript" />
-
 ## JavaScript, syntax highlighted
 
 <code lang="js">
@@ -108,8 +94,6 @@ console.log(present(slides));
 </code>
 
 ---
-
-<slide title="Markdown source" />
 
 ## Markdown, as highlighted source
 
@@ -125,8 +109,6 @@ console.log(present(slides));
 </code>
 
 ---
-
-<slide title="Markdown rendered" />
 
 ## Markdown, rendered
 

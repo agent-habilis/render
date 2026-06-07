@@ -79,32 +79,36 @@ impl App {
             .collect()
     }
 
-    /// A borderless footer: the slide title on the left and `current/total` on
-    /// the right, separated by a flexible spacer. The title is rendered **as-is**
-    /// — interpreting any ANSI escapes it carries — so a deck can pass a fully
-    /// formatted statusline (colors, Nerd Font glyphs) straight from its `title`.
+    /// A borderless footer: the deck title on the left and the page indicator on
+    /// the right, separated by a flexible spacer. Both sides are rendered
+    /// **as-is** — interpreting any ANSI escapes they carry — so a deck can pass
+    /// fully formatted statusline pills (colors, Nerd Font glyphs) via its
+    /// `title` and `pagination` attributes.
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         if area.height == 0 || area.width == 0 {
             return;
         }
-        let title = self.deck.slides[self.current]
-            .footer_title(&self.deck)
-            .unwrap_or("");
-        let page = format!("{}/{}", self.current + 1, self.deck.slides.len());
+        let title = self.deck.title.as_deref().unwrap_or("");
+        let cur = self.current + 1;
+        let total_pages = self.deck.slides.len();
+        let page = match self.deck.pagination.as_deref() {
+            Some(template) => interpolate(template, cur, total_pages),
+            None => format!("{cur}/{total_pages}"),
+        };
 
         let (mut spans, left_width) = if title.is_empty() {
             (Vec::new(), 0)
         } else {
-            (title_spans(title), measure(title))
+            (styled_spans(title), measure(title))
         };
 
-        // A spacer pushes the page indicator flush right; both shrink before they
-        // would overlap on a narrow terminal.
+        // A spacer pushes the page indicator flush right; the line is clipped
+        // (page first to lose) only if it cannot fit on a very narrow terminal.
         let page_width = measure(&page);
         let total = usize::from(area.width);
         let gap = total.saturating_sub(left_width + page_width).max(1);
         spans.push(Span::raw(" ".repeat(gap)));
-        spans.push(Span::raw(page));
+        spans.extend(styled_spans(&page));
 
         // Draw on the footer's last row (a blank row stays above it for breathing
         // room) so the statusline sits flush at the bottom of the screen.
@@ -113,18 +117,49 @@ impl App {
     }
 }
 
-/// Parse the title's ANSI into styled spans. A title with no escapes is just one
+/// Parse a footer cell's ANSI into styled spans. Text with no escapes is just one
 /// plain span; a parse failure falls back to the raw text rather than dropping it.
-fn title_spans(title: &str) -> Vec<Span<'static>> {
-    title
-        .into_text()
+fn styled_spans(text: &str) -> Vec<Span<'static>> {
+    text.into_text()
         .ok()
-        .and_then(|text| text.lines.into_iter().next())
-        .map_or_else(|| vec![Span::raw(title.to_owned())], |line| line.spans)
+        .and_then(|parsed| parsed.lines.into_iter().next())
+        .map_or_else(|| vec![Span::raw(text.to_owned())], |line| line.spans)
+}
+
+/// Rust-`format!`-style interpolation of the `pagination` template: `{cur}` and
+/// `{total}` expand to the 1-based page and the slide count, `{{`/`}}` collapse
+/// to single braces, and any other `{…}` (or stray brace) is kept verbatim. ANSI
+/// escape sequences carry no braces, so they pass through untouched.
+fn interpolate(template: &str, cur: usize, total: usize) -> String {
+    let mut out = String::with_capacity(template.len());
+    let mut rest = template;
+    while let Some(idx) = rest.find(['{', '}']) {
+        out.push_str(&rest[..idx]);
+        let tail = &rest[idx..];
+        if let Some(after) = tail.strip_prefix("{cur}") {
+            out.push_str(&cur.to_string());
+            rest = after;
+        } else if let Some(after) = tail.strip_prefix("{total}") {
+            out.push_str(&total.to_string());
+            rest = after;
+        } else if let Some(after) = tail.strip_prefix("{{") {
+            out.push('{');
+            rest = after;
+        } else if let Some(after) = tail.strip_prefix("}}") {
+            out.push('}');
+            rest = after;
+        } else {
+            // A lone brace that starts no token: keep it and step past it.
+            out.push_str(&tail[..1]);
+            rest = &tail[1..];
+        }
+    }
+    out.push_str(rest);
+    out
 }
 
 /// Display width in cells (ANSI escapes stripped) so the page indicator stays
-/// flush right regardless of any formatting in the title.
+/// flush right regardless of any formatting in a footer cell.
 fn measure(text: &str) -> usize {
     console::measure_text_width(text)
 }
@@ -134,4 +169,35 @@ fn measure(text: &str) -> usize {
 pub(super) fn content_width(cols: u16) -> usize {
     let usable = usize::from(cols.saturating_sub(MARGIN * 2));
     usable.clamp(MIN_CONTENT_WIDTH, MAX_CONTENT_WIDTH)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::interpolate;
+
+    #[test]
+    fn substitutes_cur_and_total() {
+        assert_eq!(interpolate(" {cur}/{total} ", 2, 7), " 2/7 ");
+        assert_eq!(interpolate("{total}", 1, 9), "9");
+    }
+
+    #[test]
+    fn escapes_doubled_braces() {
+        assert_eq!(interpolate("{{cur}} = {cur}", 3, 5), "{cur} = 3");
+        assert_eq!(interpolate("{{}}", 1, 1), "{}");
+    }
+
+    #[test]
+    fn keeps_unknown_placeholders_and_lone_braces() {
+        assert_eq!(interpolate("{x} {cur}", 4, 8), "{x} 4");
+        assert_eq!(interpolate("a { b } c", 1, 2), "a { b } c");
+    }
+
+    #[test]
+    fn passes_ansi_through_untouched() {
+        assert_eq!(
+            interpolate("\x1b[1m{cur}\x1b[0m", 6, 10),
+            "\x1b[1m6\x1b[0m"
+        );
+    }
 }

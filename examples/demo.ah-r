@@ -12,11 +12,9 @@ Use the **arrow keys** to move between slides, `q` to quit.
 
 - One file, slides separated by `---`
 - Each slide is plain **Markdown**
-- Content is centered, with a man-style footer below
+- Content is centered, with a footer below
 
 ---
-
-<slide title="Diagrams" />
 
 ## Mermaid, inline
 
@@ -30,17 +28,14 @@ flowchart LR
 
 ---
 
-<slide title="Overrides" />
+## Footer
 
-## Per-slide titles
+The deck title rides the bottom-left on every slide, and the page
+indicator the bottom-right.
 
-This slide overrides the footer title via its own `<slide>` tag.
-
-Everything else falls back to the deck title.
+Both come from the `<deck>` frontmatter at the top of the file.
 
 ---
-
-<slide title="Live shell" />
 
 ## Real processes, live
 
@@ -52,8 +47,6 @@ This box runs a real shell command, streaming its output.
 
 ---
 
-<slide title="It keeps running" />
-
 ## The same process, one slide later
 
 The counter is `persist` with `id=counter`, so it was **not** restarted —
@@ -64,8 +57,6 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 </tty>
 
 ---
-
-<slide title="Colors" />
 
 ## Colors, like a native terminal
 
