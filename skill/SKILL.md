@@ -1,6 +1,6 @@
 ---
 name: render
-description: Render a diagram, document, table, or slide deck as terminal text via the `ah-r` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), CSV/TSV tables (`.csv`/`.tsv`), and `.ah-r` presentations. Use when asked to draw, preview, or display a diagram/markdown/table/deck in the terminal.
+description: Render a diagram, document, table, slide deck, or image as terminal text via the `ah-r` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), CSV/TSV tables (`.csv`/`.tsv`), `.ah-r` presentations, and images (`.png`/`.jpg`/`.jpeg`/`.gif`/`.webp`). Use when asked to draw, preview, or display a diagram/markdown/table/deck/image in the terminal.
 allowed-tools: Bash(ah-r:*)
 ---
 
@@ -38,6 +38,9 @@ ah-r data.csv
 
 # A presentation (.ah-r) opens full-screen — only in an interactive terminal:
 ah-r slides.ah-r
+
+# An image (.png/.jpg/.jpeg/.gif/.webp) prints inline — only in an interactive terminal:
+ah-r photo.png
 ```
 
 Pick the form that matches the file:
@@ -49,6 +52,9 @@ Pick the form that matches the file:
 - **Deck** → `ah-r <file>.ah-r` takes over the terminal (arrow keys navigate,
   `q` quits). It needs an interactive TTY; in a pipe or non-interactive shell it
   errors instead of rendering, so run it directly for the user.
+- **Image** → `ah-r <file>.png` (`.jpg`/`.jpeg`/`.gif`/`.webp`) prints the image
+  inline and returns. Like a deck it needs an interactive TTY and errors in a
+  pipe, so run it directly for the user.
 
 An unsupported or missing extension is an error — report it rather than
 guessing the format.

@@ -5,7 +5,7 @@ use ratatui::text::{Line, Span};
 use ratatui::widgets::Paragraph;
 
 use super::app::App;
-use super::components::Item;
+use super::components::{Align, Item, Placement};
 use super::segment::Segment;
 
 const MARGIN: u16 = 4;
@@ -27,24 +27,24 @@ impl App {
                 .flex(Flex::Center)
                 .spacing(1)
                 .split(content);
-            // Left-aligned items share one column, sized to the widest, so prose
-            // and code line up flush-left while centered items float.
+            // Text-column items share one column, sized to the widest, so prose
+            // and code line up flush-left while aligned items float.
             let column_width = laid
                 .iter()
-                .filter(|(_, item)| item.left_align)
+                .filter(|(_, item)| item.placement == Placement::Column)
                 .map(|(_, item)| item.width)
                 .max()
                 .unwrap_or(0);
             for ((index, item), cell) in laid.iter().zip(cells.iter()) {
-                let area = if item.left_align {
-                    let margin = cell.width.saturating_sub(column_width) / 2;
-                    let width = item.width.min(cell.width.saturating_sub(margin));
-                    Rect::new(cell.x + margin, cell.y, width, cell.height)
-                } else {
-                    let [centered] = Layout::horizontal([Constraint::Length(item.width)])
-                        .flex(Flex::Center)
-                        .areas(*cell);
-                    centered
+                let area = match item.placement {
+                    Placement::Column => {
+                        let margin = cell.width.saturating_sub(column_width) / 2;
+                        let width = item.width.min(cell.width.saturating_sub(margin));
+                        Rect::new(cell.x + margin, cell.y, width, cell.height)
+                    }
+                    Placement::Left => aligned(*cell, item.width, Align::Left),
+                    Placement::Center => aligned(*cell, item.width, Align::Center),
+                    Placement::Right => aligned(*cell, item.width, Align::Right),
                 };
                 let cached = &self.static_render.items[*index];
                 let ctx = self.frame_ctx(cached, *index, content, blink_on);
@@ -166,9 +166,36 @@ pub(super) fn content_width(cols: u16) -> usize {
     usable.clamp(MIN_CONTENT_WIDTH, MAX_CONTENT_WIDTH)
 }
 
+/// Place a free-floating item of width `item_w` in `cell`: `Left`/`Right` hug the
+/// edges of the centered content column; `Center` centers in the cell. The width
+/// is clamped so the item never runs off the right edge.
+fn aligned(cell: Rect, item_w: u16, align: Align) -> Rect {
+    let content_w = u16::try_from(content_width(cell.width))
+        .unwrap_or(u16::MAX)
+        .min(cell.width);
+    let col_x = cell.x + cell.width.saturating_sub(content_w) / 2;
+    let start = match align {
+        Align::Left => col_x,
+        Align::Right => (col_x + content_w).saturating_sub(item_w),
+        Align::Center => cell.x + cell.width.saturating_sub(item_w) / 2,
+    };
+    let width = item_w.min(cell.width.saturating_sub(start));
+    Rect::new(start, cell.y, width, cell.height)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::interpolate;
+    use super::{Align, aligned, interpolate};
+    use ratatui::layout::Rect;
+
+    #[test]
+    fn aligns_within_the_centered_content_column() {
+        // 100 cols → content column 92, centered, so its left edge is at x=4.
+        let cell = Rect::new(0, 0, 100, 5);
+        assert_eq!(aligned(cell, 10, Align::Left).x, 4);
+        assert_eq!(aligned(cell, 10, Align::Right).x, 86); // 4 + 92 - 10
+        assert_eq!(aligned(cell, 10, Align::Center).x, 45); // centered in the cell
+    }
 
     #[test]
     fn substitutes_cur_and_total() {

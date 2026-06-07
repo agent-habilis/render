@@ -79,6 +79,8 @@ syntect = { version = "5.3.0", default-features = false, features = ["default-fa
 two-face = { version = "0.5.1", default-features = false, features = ["syntect-fancy"] }
 csv = "1.4.0"
 comfy-table = "7.2.2"
+ratatui-image = { version = "11.0.4", default-features = false, features = ["crossterm"] }
+image = { version = "0.25.6", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 [dev-dependencies]
 # Drives the `.ah-r` integration test through a real pseudo-terminal.

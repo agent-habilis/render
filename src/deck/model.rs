@@ -11,6 +11,9 @@ pub(crate) struct Deck {
     /// Footer page-indicator template (`{cur}`/`{total}`); `None` ⇒ the default
     /// `current/total`.
     pub(crate) pagination: Option<String>,
+    /// Report deck position to the terminal via OSC 9;4 while open. On by
+    /// default; `<deck progress="false" />` turns it off.
+    pub(crate) progress: bool,
     pub(crate) slides: Vec<Slide>,
 }
 
@@ -30,7 +33,10 @@ impl Slide {
 /// A malformed or empty document yields the slides it can (possibly none — the
 /// caller treats that as an error).
 pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
-    let mut deck = Deck::default();
+    let mut deck = Deck {
+        progress: true,
+        ..Deck::default()
+    };
     let mut deck_tags = 0_usize;
 
     for section in split_slides(input) {
@@ -43,6 +49,9 @@ pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
             }
             if meta.pagination.is_some() {
                 deck.pagination = meta.pagination;
+            }
+            if let Some(progress) = meta.progress {
+                deck.progress = progress;
             }
         }
 
@@ -95,8 +104,12 @@ fn split_slides(input: &str) -> Vec<String> {
                 if let Some(open_len) = open_fence_len(trimmed) {
                     state = State::Fence(open_len);
                     current.push(line);
-                } else if let Some((component, _)) = xml_open(trimmed) {
-                    state = State::Xml(component);
+                } else if let Some((component, _, self_closing)) = xml_open(trimmed) {
+                    // A self-closing or void tag is complete on its line; only a
+                    // paired tag opens a body that a `---` inside must not split.
+                    if !self_closing && !component.is_void() {
+                        state = State::Xml(component);
+                    }
                     current.push(line);
                 } else if trimmed == "---" {
                     sections.push(current.join("\n"));
@@ -115,6 +128,9 @@ fn split_slides(input: &str) -> Vec<String> {
 struct DeckMeta {
     title: Option<String>,
     pagination: Option<String>,
+    /// `None` when absent, so it doesn't override the default; `progress="false"`
+    /// is the only way to turn the OSC 9;4 reporting off.
+    progress: Option<bool>,
 }
 
 /// Only tags at the very start (after blank lines) are treated as metadata; a
@@ -157,9 +173,13 @@ fn meta_tag(trimmed: &str) -> Option<DeckMeta> {
             .find(|(key, _)| key == name)
             .and_then(|(_, value)| value.clone())
     };
+    let present = |name: &str| tokens.iter().any(|(key, _)| key == name);
     Some(DeckMeta {
         title: attr("title"),
         pagination: attr("pagination"),
+        // Present (a bare `progress` flag or any value but "false") enables it;
+        // absent leaves the default untouched.
+        progress: present("progress").then(|| attr("progress").as_deref() != Some("false")),
     })
 }
 
@@ -171,7 +191,11 @@ mod tests {
     fn animation(segment: &Segment) -> &AnimationComponent {
         match segment {
             Segment::Animation(component) => component,
-            Segment::Markdown(_) | Segment::Tty(_) | Segment::Code(_) | Segment::Mermaid(_) => {
+            Segment::Markdown(_)
+            | Segment::Tty(_)
+            | Segment::Code(_)
+            | Segment::Mermaid(_)
+            | Segment::Image(_) => {
                 panic!("expected an animation segment")
             }
         }

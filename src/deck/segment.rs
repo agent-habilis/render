@@ -1,5 +1,6 @@
 use super::components::{
-    AnimationComponent, CodeComponent, Component, MarkdownComponent, MermaidComponent, TtyComponent,
+    AnimationComponent, CodeComponent, Component, ImageComponent, MarkdownComponent,
+    MermaidComponent, TtyComponent,
 };
 
 /// One piece of a slide, in source order. Each variant wraps the
@@ -12,6 +13,7 @@ pub(crate) enum Segment {
     Code(CodeComponent),
     Mermaid(MermaidComponent),
     Animation(AnimationComponent),
+    Image(ImageComponent),
 }
 
 impl Segment {
@@ -22,6 +24,7 @@ impl Segment {
             Segment::Code(component) => component,
             Segment::Mermaid(component) => component,
             Segment::Animation(component) => component,
+            Segment::Image(component) => component,
         }
     }
 }
@@ -32,6 +35,7 @@ pub(super) enum ComponentKind {
     Tty,
     Mermaid,
     Animation,
+    Image,
 }
 
 impl ComponentKind {
@@ -41,6 +45,7 @@ impl ComponentKind {
             "tty" => Some(Self::Tty),
             "mermaid" => Some(Self::Mermaid),
             "animation" => Some(Self::Animation),
+            "img" => Some(Self::Image),
             _ => None,
         }
     }
@@ -51,7 +56,14 @@ impl ComponentKind {
             Self::Tty => "</tty>",
             Self::Mermaid => "</mermaid>",
             Self::Animation => "</animation>",
+            Self::Image => "</img>",
         }
+    }
+
+    /// A void component carries no body, so it needs no closing tag — its opening
+    /// tag stands alone whether or not it self-closes with `/>`.
+    pub(super) fn is_void(self) -> bool {
+        matches!(self, Self::Image)
     }
 }
 
@@ -90,7 +102,15 @@ pub(super) fn split_segments(body: &str) -> Vec<Segment> {
             continue;
         }
 
-        if let Some((component, attrs)) = xml_open(trimmed) {
+        if let Some((component, attrs, self_closing)) = xml_open(trimmed) {
+            // A void component (`<img>`) or any self-closing tag has no body and
+            // needs no close tag, so it stands alone even without the `/>`.
+            if self_closing || component.is_void() {
+                flush(&mut markdown, &mut segments);
+                segments.push(build_segment(component, attrs, String::new()));
+                pos += 1;
+                continue;
+            }
             let mut close = pos + 1;
             while close < lines.len() && !xml_close(lines[close].trim(), component) {
                 close += 1;
@@ -98,14 +118,7 @@ pub(super) fn split_segments(body: &str) -> Vec<Segment> {
             if close < lines.len() {
                 flush(&mut markdown, &mut segments);
                 let content = lines[pos + 1..close].join("\n");
-                segments.push(match component {
-                    ComponentKind::Code => Segment::Code(CodeComponent::parse(attrs, content)),
-                    ComponentKind::Tty => Segment::Tty(TtyComponent::parse(attrs, content)),
-                    ComponentKind::Mermaid => Segment::Mermaid(MermaidComponent::new(content)),
-                    ComponentKind::Animation => {
-                        Segment::Animation(AnimationComponent::parse(attrs, &content))
-                    }
-                });
+                segments.push(build_segment(component, attrs, content));
                 pos = close + 1;
                 continue;
             }
@@ -120,25 +133,39 @@ pub(super) fn split_segments(body: &str) -> Vec<Segment> {
     segments
 }
 
-/// Recognise an opening tag line — `<code …>`, `<tty …>`, or `<mermaid …>` —
-/// returning the component and the attribute substring between the tag name and
-/// the closing `>`. The whole opening tag must be on the one (trimmed) line and
-/// end with `>`; `<codex>`/`<code-component>` and the like are rejected.
-pub(super) fn xml_open(trimmed: &str) -> Option<(ComponentKind, &str)> {
+fn build_segment(component: ComponentKind, attrs: &str, content: String) -> Segment {
+    match component {
+        ComponentKind::Code => Segment::Code(CodeComponent::parse(attrs, content)),
+        ComponentKind::Tty => Segment::Tty(TtyComponent::parse(attrs, content)),
+        ComponentKind::Mermaid => Segment::Mermaid(MermaidComponent::parse(attrs, content)),
+        ComponentKind::Animation => Segment::Animation(AnimationComponent::parse(attrs, &content)),
+        ComponentKind::Image => Segment::Image(ImageComponent::parse(attrs)),
+    }
+}
+
+/// Recognise an opening tag line — `<code …>`, `<tty …>`, `<img … />`, … —
+/// returning the component, the attribute substring between the tag name and the
+/// closing `>`, and whether the tag is self-closing (ends in `/>`). The whole tag
+/// must be on the one (trimmed) line and end with `>`; `<codex>`/`<code-foo>` and
+/// the like are rejected.
+pub(super) fn xml_open(trimmed: &str) -> Option<(ComponentKind, &str, bool)> {
     let rest = trimmed.strip_prefix('<')?;
     let name_end = rest
         .find(|ch: char| !ch.is_ascii_alphabetic())
         .unwrap_or(rest.len());
     let component = ComponentKind::from_name(&rest[..name_end])?;
     let after = rest[name_end..].trim_end();
-    let attrs = after.strip_suffix('>')?;
-    let attrs = attrs.strip_suffix('/').unwrap_or(attrs);
-    // The name must be followed by a boundary (whitespace or the `>`), so a
+    let inner = after.strip_suffix('>')?;
+    let (attrs, self_closing) = match inner.strip_suffix('/') {
+        Some(stripped) => (stripped, true),
+        None => (inner, false),
+    };
+    // The name must be followed by a boundary (whitespace or the tag's end), so a
     // longer name like `code-component` is not matched as `code`.
     if !attrs.is_empty() && !attrs.starts_with(char::is_whitespace) {
         return None;
     }
-    Some((component, attrs))
+    Some((component, attrs, self_closing))
 }
 
 pub(super) fn xml_close(trimmed: &str, component: ComponentKind) -> bool {
@@ -161,7 +188,11 @@ mod tests {
     fn tty(segment: &Segment) -> &super::TtyComponent {
         match segment {
             Segment::Tty(component) => component,
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
+            Segment::Markdown(_)
+            | Segment::Code(_)
+            | Segment::Mermaid(_)
+            | Segment::Animation(_)
+            | Segment::Image(_) => {
                 panic!("expected a tty segment")
             }
         }
@@ -170,7 +201,11 @@ mod tests {
     fn code(segment: &Segment) -> &super::CodeComponent {
         match segment {
             Segment::Code(component) => component,
-            Segment::Markdown(_) | Segment::Tty(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
+            Segment::Markdown(_)
+            | Segment::Tty(_)
+            | Segment::Mermaid(_)
+            | Segment::Animation(_)
+            | Segment::Image(_) => {
                 panic!("expected a code segment")
             }
         }
@@ -179,10 +214,51 @@ mod tests {
     fn animation(segment: &Segment) -> &super::AnimationComponent {
         match segment {
             Segment::Animation(component) => component,
-            Segment::Markdown(_) | Segment::Tty(_) | Segment::Code(_) | Segment::Mermaid(_) => {
+            Segment::Markdown(_)
+            | Segment::Tty(_)
+            | Segment::Code(_)
+            | Segment::Mermaid(_)
+            | Segment::Image(_) => {
                 panic!("expected an animation segment")
             }
         }
+    }
+
+    fn image(segment: &Segment) -> &super::ImageComponent {
+        match segment {
+            Segment::Image(component) => component,
+            Segment::Markdown(_)
+            | Segment::Tty(_)
+            | Segment::Code(_)
+            | Segment::Mermaid(_)
+            | Segment::Animation(_) => {
+                panic!("expected an image segment")
+            }
+        }
+    }
+
+    #[test]
+    fn self_closing_img_carries_src_and_attrs() {
+        let segs = split_segments("# Title\n\n<img src=\"assets/logo.png\" width=\"30\" />");
+        assert_eq!(segs.len(), 2);
+        assert_eq!(segs[0], Segment::Markdown("# Title\n".into()));
+        let component = image(&segs[1]);
+        assert_eq!(component.src, "assets/logo.png");
+        assert_eq!(component.width, Some(30));
+    }
+
+    #[test]
+    fn img_is_void_so_the_closing_slash_is_optional() {
+        // No `/>` and no `</img>`: still one Image segment, not literal Markdown.
+        let segs = split_segments("<img src=\"x.png\">");
+        assert_eq!(segs.len(), 1);
+        assert_eq!(image(&segs[0]).src, "x.png");
+    }
+
+    #[test]
+    fn img_shown_inside_a_fence_is_not_a_component() {
+        let body = "```html\n<img src=\"x.png\" />\n```";
+        assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
     }
 
     #[test]

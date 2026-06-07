@@ -1,41 +1,78 @@
+use std::io::Write;
+use std::path::PathBuf;
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::layout::{Rect, Size};
 use ratatui::DefaultTerminal;
+use ratatui_image::picker::Picker;
 
 use super::model::{Deck, parse_deck};
 use super::nav::{Action, action_for};
 use super::segment::Segment;
 use super::view::{FOOTER_ROWS, content_width};
 use super::components::tty::ProcessManager;
-use super::components::{Cached, FrameCtx};
+use super::components::{Cached, FrameCtx, ImageStore};
 
 /// Input-poll timeout: how often an idle slide wakes to animate and blink.
 const TICK: Duration = Duration::from_millis(100);
 /// Half-period of the running-status blink.
 const BLINK_MS: u128 = 500;
 
-/// Render a deck full-screen and navigate it until the user quits.
-pub(crate) fn run(input: &str) -> Result<()> {
+/// Render a deck full-screen and navigate it until the user quits. `base_dir` is
+/// the deck file's directory, against which `<img>` paths resolve.
+pub(crate) fn run(input: &str, base_dir: PathBuf) -> Result<()> {
     let deck = parse_deck(input)?;
     if deck.slides.is_empty() {
         bail!("no slides found: separate slides with `---` lines");
     }
+    let progress = deck.progress;
 
     let mut terminal = ratatui::init();
+    // Detect the graphics protocol *after* entering the alternate screen, as
+    // `from_query_stdio` requires (it reads/writes stdio).
+    let picker = crate::img::detect_picker();
+
     // The `App` (and so every running process) drops at the end of this
     // statement — killing its children — before the terminal is restored.
-    let result = App::new(deck).run(&mut terminal);
+    let result = App::new(deck, picker, base_dir).run(&mut terminal);
     ratatui::restore();
+    // Clear any OSC 9;4 indicator we set, so it never lingers after quitting.
+    if progress {
+        clear_terminal_progress();
+    }
     result
+}
+
+/// OSC 9;4 progress: state 1 sets the bar to `pct` (0–100). Written straight to
+/// stdout (the same fd ratatui draws to) between repaints.
+fn set_terminal_progress(pct: u8) {
+    let mut stdout = std::io::stdout();
+    let _ = write!(stdout, "\x1b]9;4;1;{pct}\x1b\\").and_then(|()| stdout.flush());
+}
+
+/// OSC 9;4 state 0 removes the indicator (no progress field).
+fn clear_terminal_progress() {
+    let mut stdout = std::io::stdout();
+    let _ = write!(stdout, "\x1b]9;4;0\x1b\\").and_then(|()| stdout.flush());
+}
+
+/// The deck-position percentage for slide `current` (0-based) of `total`. A
+/// single-slide deck is always complete.
+fn progress_pct(current: usize, total: usize) -> u8 {
+    if total <= 1 {
+        return 100;
+    }
+    let pct = (current + 1) * 100 / total;
+    u8::try_from(pct.min(100)).unwrap_or(100)
 }
 
 #[derive(Debug)]
 pub(super) struct App {
     pub(super) deck: Deck,
     pub(super) manager: ProcessManager,
+    pub(super) images: ImageStore,
     pub(super) current: usize,
     pub(super) start: Instant,
     /// Reset on every navigation, so a slide's `<animation>`s restart when it opens.
@@ -53,10 +90,11 @@ pub(super) struct StaticRender {
 }
 
 impl App {
-    fn new(deck: Deck) -> Self {
+    fn new(deck: Deck, picker: Picker, base_dir: PathBuf) -> Self {
         Self {
             deck,
             manager: ProcessManager::new(),
+            images: ImageStore::new(picker, base_dir),
             current: 0,
             start: Instant::now(),
             slide_started: Instant::now(),
@@ -67,8 +105,10 @@ impl App {
     fn run(&mut self, terminal: &mut DefaultTerminal) -> Result<()> {
         let total = self.deck.slides.len();
 
-        // Spawn `prerender` processes up front (sized to an estimate) so a
-        // slow-starting program is already warmed up when its slide is reached.
+        // Up-front, before the interactive loop: spawn `prerender` processes
+        // (sized to an estimate) so a slow program is warm when its slide is
+        // reached, and decode every `<img>` so the synchronous decode is paid
+        // once at load rather than freezing navigation on a slide's first view.
         {
             let size = terminal.size().unwrap_or(Size::new(80, 24));
             let pre_rows = size.height.saturating_sub(FOOTER_ROWS);
@@ -83,6 +123,7 @@ impl App {
                             .prerender(slide, index, component, pre_rows, pre_cols);
                     }
                 }
+                self.images.ensure(slide, &segments);
             }
         }
 
@@ -98,7 +139,14 @@ impl App {
                 self.manager.reconcile(self.current, &segments);
                 reconciled_for = self.current;
                 self.slide_started = Instant::now();
+                // Force a repaint of the whole new slide (not `terminal.clear()`,
+                // which provokes a cursor-position query that some terminals never
+                // answer): the prior slide's `<img>` cells are part of the diff, so
+                // re-drawing them as the new content overwrites the old graphic.
                 drawn = None;
+                if self.deck.progress {
+                    set_terminal_progress(progress_pct(self.current, total));
+                }
             }
 
             let Size {
@@ -164,6 +212,7 @@ impl App {
         FrameCtx {
             cached,
             manager: &self.manager,
+            images: &self.images,
             elapsed: self.slide_started.elapsed(),
             current: self.current,
             index,
@@ -186,10 +235,23 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::App;
-    use super::parse_deck;
+    use super::{App, Deck, parse_deck, progress_pct};
     use super::super::components::Cached;
     use ratatui::layout::Rect;
+    use ratatui_image::picker::Picker;
+    use std::path::PathBuf;
+
+    fn app(deck: Deck) -> App {
+        App::new(deck, Picker::halfblocks(), PathBuf::from("."))
+    }
+
+    #[test]
+    fn progress_pct_reports_deck_position() {
+        assert_eq!(progress_pct(0, 1), 100); // single slide is complete
+        assert_eq!(progress_pct(0, 4), 25);
+        assert_eq!(progress_pct(3, 4), 100); // last slide
+        assert_eq!(progress_pct(0, 0), 100); // degenerate
+    }
 
     #[test]
     fn static_render_caches_static_segments_not_processes() {
@@ -198,7 +260,7 @@ mod tests {
         )
         .unwrap();
         let segments = deck.slides[0].segments();
-        let mut app = App::new(deck);
+        let mut app = app(deck);
 
         app.refresh_static_render(&segments, 80);
         assert_eq!(app.static_render.key, Some((0, 80)));
@@ -229,7 +291,7 @@ mod tests {
     fn code_segment_is_cached_statically() {
         let deck = parse_deck("<code lang=\"rust\">\nfn main() {}\n</code>").unwrap();
         let segments = deck.slides[0].segments();
-        let mut app = App::new(deck);
+        let mut app = app(deck);
 
         app.refresh_static_render(&segments, 80);
         assert_eq!(app.static_render.items.len(), 1);
@@ -246,7 +308,7 @@ mod tests {
         )
         .unwrap();
         let segments = deck.slides[0].segments();
-        let mut app = App::new(deck);
+        let mut app = app(deck);
         app.refresh_static_render(&segments, 80);
 
         match &app.static_render.items[0] {

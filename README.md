@@ -14,8 +14,14 @@ terminal text**, choosing the renderer from the file's extension:
   is the header, every row and column is separated, and cells wrap to fit the
   terminal — via [`comfy-table`](https://crates.io/crates/comfy-table).
 - **Decks** (`.ah-r`) as a full-screen terminal presentation — Markdown slides
-  with embedded code, diagrams, live shells, and animations. See
+  with embedded code, diagrams, live shells, animations, and images (drawn with
+  the terminal's kitty/iTerm2/Sixel graphics protocol). See
   [the deck format](docs/deck-format.md).
+- **Images** (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) drawn inline with the
+  terminal's kitty/iTerm2/Sixel graphics protocol (Unicode halfblocks as a
+  fallback), via [`ratatui-image`](https://crates.io/crates/ratatui-image). The
+  image is printed at the cursor and the prompt returns below it; this needs an
+  interactive terminal.
 
 ## Usage
 
@@ -39,6 +45,7 @@ Sample inputs live in [`examples/`](examples/):
 ah-r examples/flowchart-td.mmd
 ah-r examples/sequence.mmd
 ah-r examples/table.csv
+ah-r examples/sample.png
 ```
 
 ## Build

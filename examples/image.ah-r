@@ -1,0 +1,30 @@
+<deck title="ah-r images" />
+
+# Images in a deck
+
+Drop a real image onto a slide with `<img src="…" />` — drawn with your
+terminal's graphics protocol (kitty, iTerm2, Sixel), or Unicode halfblocks as a
+fallback.
+
+<img src="sample.png" />
+
+The `src` path is resolved against the deck file's directory.
+
+---
+
+## Sized and centered
+
+Set the display size in cells with `width` / `height` — the image scales to it,
+keeping its aspect ratio (give one and the other is derived). It centers on its
+own row.
+
+<img src="sample.png" width="24" />
+
+---
+
+## A missing image
+
+When the file can't be loaded, the `alt` text is shown instead — so a broken
+path never blanks the slide.
+
+<img src="does-not-exist.png" alt="(diagram unavailable)" />

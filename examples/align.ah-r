@@ -1,0 +1,49 @@
+<deck title="the align attribute" />
+
+# The global `align` attribute
+
+`align="left | center | right"` works on **every** component — images, code,
+diagrams, animations, and live shells.
+
+Centered is the default (prose and code default to the flush-left text column).
+
+---
+
+## Three images, three alignments
+
+<img src="sample.png" width="20" align="left" />
+
+<img src="sample.png" width="20" align="center" />
+
+<img src="sample.png" width="20" align="right" />
+
+---
+
+## Code, pushed right
+
+A `<code>` block normally sits in the flush-left text column; `align="right"` floats it to the right edge instead.
+
+<code lang="rust" align="right">
+fn main() {
+    println!("hi");
+}
+</code>
+
+---
+
+## A diagram, pulled left
+
+A `<mermaid>` diagram is centered by default; `align="left"` moves it over.
+
+<mermaid align="left">
+flowchart LR
+  A --> B --> C
+</mermaid>
+
+---
+
+## A live shell, right
+
+<tty align="right" title="clock" rows="4" cols="22">
+while :; do date "+%H:%M:%S"; sleep 1; done
+</tty>

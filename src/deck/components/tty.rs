@@ -12,7 +12,7 @@ use ratatui::text::Line;
 use ratatui::widgets::{Block, Paragraph};
 use tui_term::widget::PseudoTerminal;
 
-use super::{Cached, FrameCtx, Item};
+use super::{Align, Cached, FrameCtx, Item};
 use crate::deck::Segment;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
@@ -32,6 +32,7 @@ pub(crate) struct TtyComponent {
     /// Raw keystrokes (with `\r`/`\n`/`\t`/`\e`/`\\` escapes) fed in after start
     /// to drive a TUI; decoded by [`decode_keys`].
     pub(crate) keys: Option<String>,
+    pub(crate) align: Option<Align>,
     pub(crate) command: String,
 }
 
@@ -54,6 +55,7 @@ impl TtyComponent {
                 _ => {}
             }
         }
+        component.align = super::parse_align(attrs);
         component
     }
 
@@ -71,6 +73,10 @@ impl super::Component for TtyComponent {
         Cached::Live
     }
 
+    fn align(&self) -> Option<Align> {
+        self.align
+    }
+
     fn lay_out(&self, ctx: &FrameCtx<'_>) -> Option<Item> {
         let proc = ctx.manager.proc_for(ctx.current, ctx.index, self);
         let (rows, cols) = proc.map_or_else(
@@ -86,7 +92,7 @@ impl super::Component for TtyComponent {
         Some(Item {
             width: cols.saturating_add(2).min(ctx.content.width),
             height: rows.saturating_add(2).min(ctx.content.height),
-            left_align: false,
+            placement: self.placement(),
             text: None,
         })
     }
@@ -518,9 +524,11 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
         .iter()
         .filter_map(|segment| match segment {
             Segment::Tty(component) => persistent_id(component).map(str::to_owned),
-            Segment::Markdown(_) | Segment::Code(_) | Segment::Mermaid(_) | Segment::Animation(_) => {
-                None
-            }
+            Segment::Markdown(_)
+            | Segment::Code(_)
+            | Segment::Mermaid(_)
+            | Segment::Animation(_)
+            | Segment::Image(_) => None,
         })
         .collect()
 }

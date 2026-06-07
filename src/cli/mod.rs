@@ -2,12 +2,12 @@ mod args;
 mod setup;
 
 use std::io::{IsTerminal, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
-use crate::{deck, markdown, mermaid, table};
+use crate::{deck, imageview, markdown, mermaid, table};
 use args::{Cli, Command};
 
 /// Render a file (default), or install/remove the `/render` skill.
@@ -37,6 +37,7 @@ enum Format {
     /// A delimited-data table; the byte is the field separator (`,` / tab).
     Table(u8),
     Deck,
+    Image,
 }
 
 fn format_for_extension(path: &Path) -> Option<Format> {
@@ -51,6 +52,7 @@ fn format_for_extension(path: &Path) -> Option<Format> {
         Some("csv") => Some(Format::Table(b',')),
         Some("tsv" | "tab") => Some(Format::Table(b'\t')),
         Some("ah-r") => Some(Format::Deck),
+        Some("png" | "jpg" | "jpeg" | "gif" | "webp") => Some(Format::Image),
         _ => None,
     }
 }
@@ -59,10 +61,24 @@ fn render_file(path: &Path) -> Result<()> {
     // Resolve the renderer before reading, so a bad extension fails fast.
     let Some(format) = format_for_extension(path) else {
         bail!(
-            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, .csv, .tsv, or .ah-r extension",
+            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, .csv, .tsv, .ah-r, or image (.png/.jpg/.jpeg/.gif/.webp) extension",
             path.display()
         );
     };
+
+    // An image is binary and takes over terminal I/O to draw itself, so it is
+    // handled before the text read (`read_to_string` would choke on the bytes).
+    // It needs an interactive TTY: stdout to draw, stdin for the cursor query
+    // that anchors the inline viewport.
+    if format == Format::Image {
+        if !std::io::stdout().is_terminal() || !std::io::stdin().is_terminal() {
+            bail!(
+                "`{}` is an image; run it in an interactive terminal (not a pipe or redirect)",
+                path.display()
+            );
+        }
+        return imageview::render(path);
+    }
 
     let input = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read `{}`", path.display()))?;
@@ -86,8 +102,13 @@ fn render_file(path: &Path) -> Result<()> {
                     path.display()
                 );
             }
-            return deck::run(&input);
+            let base_dir = path
+                .parent()
+                .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
+            return deck::run(&input, base_dir);
         }
+        // Images are binary and return before the text read above.
+        Format::Image => unreachable!("images are handled before read_to_string"),
     };
 
     let mut stdout = std::io::stdout();
@@ -108,5 +129,32 @@ fn render_file(path: &Path) -> Result<()> {
         // filter; Rust ignores SIGPIPE, so EPIPE surfaces here instead.
         Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
         Err(err) => Err(anyhow::anyhow!("failed to write stdout: {err}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Format, format_for_extension};
+    use std::path::Path;
+
+    #[test]
+    fn maps_image_extensions_case_insensitively() {
+        for ext in ["png", "jpg", "jpeg", "gif", "webp", "PNG", "JPG", "WebP"] {
+            let path = format!("pic.{ext}");
+            assert_eq!(
+                format_for_extension(Path::new(&path)),
+                Some(Format::Image),
+                "{path} should be an image",
+            );
+        }
+    }
+
+    #[test]
+    fn keeps_existing_format_mapping() {
+        assert_eq!(format_for_extension(Path::new("a.mmd")), Some(Format::Mermaid));
+        assert_eq!(format_for_extension(Path::new("a.md")), Some(Format::Markdown));
+        assert_eq!(format_for_extension(Path::new("a.csv")), Some(Format::Table(b',')));
+        assert_eq!(format_for_extension(Path::new("a.ah-r")), Some(Format::Deck));
+        assert_eq!(format_for_extension(Path::new("a.bmp")), None);
     }
 }

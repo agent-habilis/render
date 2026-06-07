@@ -47,6 +47,11 @@ Optional metadata is a self-closing `<deck>` tag at the **start** of a slide
 - `pagination="…"` — a template for the footer's page indicator. `{cur}` and
   `{total}` expand to the current page (1-based) and the slide count; `{{`/`}}`
   are literal braces. Omit it for the default `current/total`.
+- `progress="false"` — turn off the terminal progress indicator. While a deck is
+  open `ah-r` reports the current slide of the total via the **OSC 9;4** escape,
+  so terminals that support it (Ghostty, WezTerm, kitty, Windows Terminal,
+  ConEmu) show a progress bar in the tab/taskbar; it's cleared on quit. On by
+  default — `progress="false"` (or the bare `progress` flag to force it on).
 
 Both `title` and `pagination` are rendered **as-is**, so they can carry ANSI
 colors and Nerd Font glyphs — e.g. a powerline pill (see `statusline.ah-r` and
@@ -78,9 +83,17 @@ draw a diagram use the `<mermaid>` component below.
 
 Components are XML islands. An opening tag must sit on its own line (trimmed),
 the whole tag on that one line ending in `>`; the closing tag is `</name>` on
-its own line. A tag that never closes is left as plain Markdown, and a
-`<code>`-looking line inside an opaque ` ``` ` fence is not parsed as a
-component.
+its own line (or the tag self-closes with `/>`, like `<img … />`). A tag that
+never closes is left as plain Markdown, and a `<code>`-looking line inside an
+opaque ` ``` ` fence is not parsed as a component.
+
+### A global attribute: `align`
+
+Every component takes `align="left | center | right"`, controlling its horizontal
+placement on the slide. The default is centered, except `<code>` (and prose),
+which defaults to the shared flush-left text column; an explicit `align` overrides
+that. `left` and `right` hug the edges of the centered content column. See
+[`examples/align.ah-r`](../examples/align.ah-r).
 
 ### `<code lang="…">` — syntax-highlighted code
 
@@ -153,6 +166,27 @@ the flip.
 - `loop` — bare flag; wrap forever. Without it the animation plays once and
   holds the last frame.
 
+### `<img … />` — an image
+
+Draws an image file with the terminal's graphics protocol — kitty, iTerm2, or
+Sixel for true pixels, falling back to Unicode halfblocks on terminals that
+support none. It is a **void tag** (no body); the trailing `/` is optional, and
+the image is centered on its own row.
+
+```text
+<img src="assets/logo.png" width="40" />
+```
+
+| Attribute | Meaning |
+| --- | --- |
+| `src` | Path to the image, resolved against the deck file's directory (absolute paths are used as-is). |
+| `width` / `height` | Target display size in cells, scaling the image up or down to it. Aspect ratio is always preserved: give one and the other is derived; give both to fit within that box; give neither for the natural size. Clamped to the slide so it never overflows. |
+| `alt` | Text drawn in place of the image when the file can't be loaded, so a broken path never blanks the slide. |
+
+The graphics protocol is detected at deck load by querying the terminal. Set
+`AH_R_NO_IMAGE_QUERY=1` to skip that query (forcing the halfblock fallback) on
+terminals where it misbehaves.
+
 ## A minimal deck
 
 ```text
@@ -177,4 +211,5 @@ date
 ```
 
 See [`examples/`](../examples/) for complete decks: `showcase.ah-r`,
-`animation.ah-r`, `demo.ah-r`, `nvim.ah-r`, `statusline.ah-r`.
+`animation.ah-r`, `demo.ah-r`, `nvim.ah-r`, `statusline.ah-r`, `image.ah-r`,
+`align.ah-r`.

@@ -3,7 +3,7 @@ use std::time::Duration;
 use ansi_to_tui::IntoText;
 use ratatui::text::Text;
 
-use super::{Cached, Component, FrameCtx, Item, tokenize_attrs};
+use super::{Align, Cached, Component, FrameCtx, Item, parse_align, tokenize_attrs};
 
 /// Default per-frame duration when `seconds` is absent or unparseable.
 const DEFAULT_MS: u32 = 1000;
@@ -17,6 +17,7 @@ pub(crate) struct AnimationComponent {
     pub(crate) frame_ms: u32,
     /// `loop`: wrap back to the first frame forever; else hold the last.
     pub(crate) looping: bool,
+    pub(crate) align: Option<Align>,
     /// Each frame verbatim, as preformatted text.
     pub(crate) frames: Vec<String>,
 }
@@ -46,6 +47,7 @@ impl AnimationComponent {
         Self {
             frame_ms,
             looping,
+            align: parse_align(attrs),
             frames: parse_frames(content),
         }
     }
@@ -76,6 +78,10 @@ impl Component for AnimationComponent {
         Cached::Frames(self.frames.iter().map(|frame| frame_item(frame)).collect())
     }
 
+    fn align(&self) -> Option<Align> {
+        self.align
+    }
+
     fn lay_out(&self, ctx: &FrameCtx<'_>) -> Option<Item> {
         let Cached::Frames(frames) = ctx.cached else {
             return None;
@@ -87,7 +93,7 @@ impl Component for AnimationComponent {
         Some(Item {
             width: (*width).min(ctx.content.width),
             height: *height,
-            left_align: false,
+            placement: self.placement(),
             text: Some(text.clone()),
         })
     }

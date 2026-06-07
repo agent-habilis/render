@@ -1,9 +1,10 @@
-use super::{Cached, Component, measured_text, tokenize_attrs};
+use super::{Align, Cached, Component, measured_text, parse_align, tokenize_attrs};
 use crate::deck;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CodeComponent {
     pub(crate) lang: String,
+    pub(crate) align: Option<Align>,
     pub(crate) code: String,
 }
 
@@ -14,7 +15,11 @@ impl CodeComponent {
             .find(|(key, _)| key == "lang")
             .and_then(|(_, value)| value)
             .unwrap_or_default();
-        Self { lang, code }
+        Self {
+            lang,
+            align: parse_align(attrs),
+            code,
+        }
     }
 }
 
@@ -26,6 +31,10 @@ impl Component for CodeComponent {
 
     fn left_align(&self) -> bool {
         true
+    }
+
+    fn align(&self) -> Option<Align> {
+        self.align
     }
 }
 
