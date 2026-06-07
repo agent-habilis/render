@@ -16,9 +16,9 @@ use super::setup::Agent;
 pub(crate) struct Cli {
     /// Path to the input file. The extension selects the renderer:
     /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown,
-    /// `.csv`/`.tsv` → table, `.ah-r` → full-screen presentation.
+    /// `.csv`/`.tsv` → table, `.ahr-deck` → full-screen presentation.
     pub(super) path: Option<PathBuf>,
-    /// Live-reload a `.ah-r` deck: watch the file and re-render on save, keeping
+    /// Live-reload a `.ahr-deck` deck: watch the file and re-render on save, keeping
     /// your place and any running `<tty>` processes. Ignored for other formats.
     #[arg(long)]
     pub(super) watch: bool,

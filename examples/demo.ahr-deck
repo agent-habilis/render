@@ -20,7 +20,7 @@ Use the **arrow keys** to move between slides, `q` to quit.
 
 <mermaid>
 flowchart LR
-    A[Write .ah-r] --> B[ah-r deck.ah-r]
+    A[Write .ahr-deck] --> B[ah-r deck.ahr-deck]
     B --> C{Present}
     C --> D[Arrow keys]
     C --> E[q to quit]

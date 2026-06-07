@@ -13,7 +13,7 @@ terminal text**, choosing the renderer from the file's extension:
 - **Tables** (`.csv`, `.tsv`) as a rounded-corner terminal grid — the first row
   is the header, every row and column is separated, and cells wrap to fit the
   terminal — via [`comfy-table`](https://crates.io/crates/comfy-table).
-- **Decks** (`.ah-r`) as a full-screen terminal presentation — Markdown slides
+- **Decks** (`.ahr-deck`) as a full-screen terminal presentation — Markdown slides
   with embedded code, diagrams, live shells, animations, and images (drawn with
   the terminal's kitty/iTerm2/Sixel graphics protocol). `--watch` live-reloads
   the deck as you edit it. See [the deck format](docs/deck-format.md).

@@ -1,6 +1,6 @@
 ---
 name: render
-description: Render a diagram, document, table, slide deck, or image as terminal text via the `ah-r` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), CSV/TSV tables (`.csv`/`.tsv`), `.ah-r` presentations, and images (`.png`/`.jpg`/`.jpeg`/`.gif`/`.webp`). Use when asked to draw, preview, or display a diagram/markdown/table/deck/image in the terminal.
+description: Render a diagram, document, table, slide deck, or image as terminal text via the `ah-r` CLI — Mermaid diagrams (`.mmd`/`.mermaid`), Markdown (`.md`/`.markdown`), CSV/TSV tables (`.csv`/`.tsv`), `.ahr-deck` presentations, and images (`.png`/`.jpg`/`.jpeg`/`.gif`/`.webp`). Use when asked to draw, preview, or display a diagram/markdown/table/deck/image in the terminal.
 allowed-tools: Bash(ah-r:*)
 ---
 
@@ -36,8 +36,8 @@ ah-r notes.md | less -R
 # Table (.csv / .tsv) — a rounded-corner grid; the first row is the header:
 ah-r data.csv
 
-# A presentation (.ah-r) opens full-screen — only in an interactive terminal:
-ah-r slides.ah-r
+# A presentation (.ahr-deck) opens full-screen — only in an interactive terminal:
+ah-r slides.ahr-deck
 
 # An image (.png/.jpg/.jpeg/.gif/.webp) prints inline — only in an interactive terminal:
 ah-r photo.png
@@ -49,7 +49,7 @@ Pick the form that matches the file:
 - **Document** → `ah-r <file>.md`; pipe through `less -R` to preserve color.
 - **Table** → `ah-r <file>.csv` (or `.tsv` for tab-separated); the first row is
   styled as the header and wide cells wrap to the terminal.
-- **Deck** → `ah-r <file>.ah-r` takes over the terminal (arrow keys navigate,
+- **Deck** → `ah-r <file>.ahr-deck` takes over the terminal (arrow keys navigate,
   `q` quits). It needs an interactive TTY; in a pipe or non-interactive shell it
   errors instead of rendering, so run it directly for the user.
 - **Image** → `ah-r <file>.png` (`.jpg`/`.jpeg`/`.gif`/`.webp`) prints the image

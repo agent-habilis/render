@@ -51,7 +51,7 @@ fn format_for_extension(path: &Path) -> Option<Format> {
         Some("md" | "markdown") => Some(Format::Markdown),
         Some("csv") => Some(Format::Table(b',')),
         Some("tsv" | "tab") => Some(Format::Table(b'\t')),
-        Some("ah-r") => Some(Format::Deck),
+        Some("ahr-deck") => Some(Format::Deck),
         Some("png" | "jpg" | "jpeg" | "gif" | "webp") => Some(Format::Image),
         _ => None,
     }
@@ -61,7 +61,7 @@ fn render_file(path: &Path, watch: bool) -> Result<()> {
     // Resolve the renderer before reading, so a bad extension fails fast.
     let Some(format) = format_for_extension(path) else {
         bail!(
-            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, .csv, .tsv, .ah-r, or image (.png/.jpg/.jpeg/.gif/.webp) extension",
+            "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, .csv, .tsv, .ahr-deck, or image (.png/.jpg/.jpeg/.gif/.webp) extension",
             path.display()
         );
     };
@@ -151,7 +151,7 @@ mod tests {
         assert_eq!(format_for_extension(Path::new("a.mmd")), Some(Format::Mermaid));
         assert_eq!(format_for_extension(Path::new("a.md")), Some(Format::Markdown));
         assert_eq!(format_for_extension(Path::new("a.csv")), Some(Format::Table(b',')));
-        assert_eq!(format_for_extension(Path::new("a.ah-r")), Some(Format::Deck));
+        assert_eq!(format_for_extension(Path::new("a.ahr-deck")), Some(Format::Deck));
         assert_eq!(format_for_extension(Path::new("a.bmp")), None);
     }
 }

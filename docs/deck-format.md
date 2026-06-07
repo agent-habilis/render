@@ -1,12 +1,12 @@
-# The `.ah-r` deck format
+# The `.ahr-deck` deck format
 
-An `.ah-r` deck is a **Markdown file with embedded XML islands**. `ah-r` renders
+An `.ahr-deck` deck is a **Markdown file with embedded XML islands**. `ah-r` renders
 it as a full-screen terminal presentation: each slide is a vertically-centered
 stack of Markdown prose and embedded components (code, diagrams, live shells,
 animations).
 
 ```sh
-ah-r slides.ah-r
+ah-r slides.ahr-deck
 ```
 
 A deck takes over the terminal, so it needs an **interactive TTY** on both
@@ -22,7 +22,7 @@ Navigate with the arrow keys; press `q` to quit.
 
 ## Live reload (`--watch`)
 
-`ah-r slides.ah-r --watch` watches the file and re-renders on every save, so you
+`ah-r slides.ahr-deck --watch` watches the file and re-renders on every save, so you
 can edit and preview in a tight loop. It keeps your place (the current page) and
 leaves any running `<tty>` processes alive across the reload. If the page you're
 on no longer exists — e.g. you deleted the last few slides — it drops to the new
@@ -64,8 +64,8 @@ Optional metadata is a self-closing `<deck>` tag at the **start** of a slide
   default — `progress="false"` (or the bare `progress` flag to force it on).
 
 Both `title` and `pagination` are rendered **as-is**, so they can carry ANSI
-colors and Nerd Font glyphs — e.g. a powerline pill (see `statusline.ah-r` and
-`typography.ah-r`).
+colors and Nerd Font glyphs — e.g. a powerline pill (see `statusline.ahr-deck` and
+`typography.ahr-deck`).
 
 ```text
 <deck title="My Talk" pagination=" {cur}/{total} " />
@@ -103,7 +103,7 @@ Every component takes `align="left | center | right"`, controlling its horizonta
 placement on the slide. The default is centered, except `<code>` (and prose),
 which defaults to the shared flush-left text column; an explicit `align` overrides
 that. `left` and `right` hug the edges of the centered content column. See
-[`examples/align.ah-r`](../examples/align.ah-r).
+[`examples/align.ahr-deck`](../examples/align.ahr-deck).
 
 ### `<code lang="…">` — syntax-highlighted code
 
@@ -220,6 +220,6 @@ date
 </tty>
 ```
 
-See [`examples/`](../examples/) for complete decks: `showcase.ah-r`,
-`animation.ah-r`, `demo.ah-r`, `nvim.ah-r`, `statusline.ah-r`, `image.ah-r`,
-`align.ah-r`.
+See [`examples/`](../examples/) for complete decks: `showcase.ahr-deck`,
+`animation.ahr-deck`, `demo.ahr-deck`, `nvim.ahr-deck`, `statusline.ahr-deck`,
+`image.ahr-deck`, `align.ahr-deck`.

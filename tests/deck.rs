@@ -23,7 +23,7 @@ fn temp_deck(contents: &str, extension: &str) -> PathBuf {
 
 #[test]
 fn deck_outside_a_terminal_is_rejected() {
-    let path = temp_deck("# One\n\n---\n\n# Two\n", "ah-r");
+    let path = temp_deck("# One\n\n---\n\n# Two\n", "ahr-deck");
     let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
     let _ = std::fs::remove_file(&path);
 
@@ -48,7 +48,7 @@ fn unsupported_extension_is_rejected() {
 
 #[test]
 fn deck_renders_slides_and_quits_in_a_pty() {
-    let path = temp_deck("# Slide One\n\n---\n\n# Slide Two\n", "ah-r");
+    let path = temp_deck("# Slide One\n\n---\n\n# Slide Two\n", "ahr-deck");
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -125,7 +125,7 @@ fn deck_with_image_renders_and_quits() {
 /// cleanly along with everything it drew. Skips the graphics-protocol query so
 /// the `q` isn't swallowed and the image takes the halfblock path.
 fn run_deck_to_quit(contents: &str) -> (bool, String) {
-    let path = temp_deck(contents, "ah-r");
+    let path = temp_deck(contents, "ahr-deck");
 
     let pair = native_pty_system()
         .openpty(PtySize {
@@ -178,7 +178,7 @@ fn run_deck_to_quit(contents: &str) -> (bool, String) {
 
 #[test]
 fn watched_deck_reloads_on_change() {
-    let path = temp_deck("# First Heading\n", "ah-r");
+    let path = temp_deck("# First Heading\n", "ahr-deck");
 
     let pair = native_pty_system()
         .openpty(PtySize {

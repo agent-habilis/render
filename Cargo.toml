@@ -83,7 +83,7 @@ ratatui-image = { version = "11.0.4", default-features = false, features = ["cro
 image = { version = "0.25.6", default-features = false, features = ["png", "jpeg", "gif", "webp"] }
 
 [dev-dependencies]
-# Drives the `.ah-r` integration test through a real pseudo-terminal.
+# Drives the `.ahr-deck` integration test through a real pseudo-terminal.
 portable-pty = "0.9.0"
 
 [profile.release]

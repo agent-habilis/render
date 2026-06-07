@@ -14,7 +14,7 @@ Arrow keys to navigate, `q` to quit.
 An untagged fence renders as a styled (non-highlighted) block:
 
 ```
-$ ah-r showcase.ah-r
+$ ah-r showcase.ahr-deck
 rendering 11 slides…
 ```
 

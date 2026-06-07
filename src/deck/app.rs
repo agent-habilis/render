@@ -350,7 +350,7 @@ mod tests {
     use std::path::PathBuf;
 
     fn app(deck: Deck) -> App {
-        App::new(deck, Picker::halfblocks(), PathBuf::from("deck.ah-r"), false)
+        App::new(deck, Picker::halfblocks(), PathBuf::from("deck.ahr-deck"), false)
     }
 
     const SIZE: Size = Size {
