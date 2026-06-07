@@ -3,9 +3,10 @@ use std::path::{Path, PathBuf};
 use xshell::{Shell, cmd};
 
 use crate::TaskOutcome;
+use crate::util::output;
 
 pub(crate) fn run(sh: &Shell) -> TaskOutcome {
-    eprintln!("=> Installing ah-r...");
+    output::status("Installing", "ah-r");
     // Anchor `--path` at the repo root (parent of this `tasks/` crate),
     // computed at compile time, so the task installs `ah-r` no matter which
     // directory it is invoked from — not whatever crate happens to be in the
@@ -21,6 +22,6 @@ pub(crate) fn run(sh: &Shell) -> TaskOutcome {
     cmd!(sh, "cargo install --path {root} --force")
         .quiet()
         .run()?;
-    eprintln!("=> Installed to ~/.cargo/bin/ah-r");
+    output::status("Installed", "~/.cargo/bin/ah-r");
     Ok(())
 }

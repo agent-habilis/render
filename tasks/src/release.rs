@@ -2,6 +2,7 @@ use xshell::{Shell, cmd};
 
 use crate::TaskOutcome;
 use crate::util::ensure_installed;
+use crate::util::output;
 
 pub(crate) fn run(sh: &Shell, args: &[String]) -> TaskOutcome {
     if let Some((level, extra)) = args.split_first() {
@@ -19,14 +20,14 @@ pub(crate) fn run(sh: &Shell, args: &[String]) -> TaskOutcome {
         {
             release_args.push("--no-confirm".to_owned());
         }
-        eprintln!("=> cargo release {level} {}", release_args.join(" "));
+        output::status("Running", &format!("cargo release {level} {}", release_args.join(" ")));
         cmd!(sh, "cargo release {level} {release_args...}")
             .quiet()
             .run()?;
         return Ok(());
     }
-    eprintln!("=> Building release binary...");
+    output::status("Building", "release binary");
     cmd!(sh, "cargo build --release").quiet().run()?;
-    eprintln!("=> Binary: target/release/ah-r");
+    output::status("Built", "target/release/ah-r");
     Ok(())
 }

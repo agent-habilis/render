@@ -4,6 +4,9 @@
 use std::io::IsTerminal;
 use std::ops::Range;
 
+use termimad::crossterm::style::{Attribute, Color};
+use termimad::{Alignment, CompoundStyle, LineStyle, MadSkin, rgb};
+
 use crate::mermaid::mermaid;
 
 /// Draws any embedded ` ```mermaid ` fenced blocks inline. A block figurehead
@@ -62,8 +65,32 @@ fn markdown_to_width(input: &str, width: usize) -> String {
 }
 
 fn termimad(input: &str, width: usize) -> String {
-    let skin = termimad::MadSkin::default();
-    skin.text(input, Some(width)).to_string()
+    skin().text(input, Some(width)).to_string()
+}
+
+/// termimad's default skin only bolds `h1`, underlines every level, and renders
+/// `h2`–`h6` identically otherwise. This gives each level a distinct color and
+/// weight so the heading hierarchy reads at a glance (palette from the Tokyo
+/// Night code-highlight theme), left-aligned to match the surrounding prose.
+fn skin() -> MadSkin {
+    let mut skin = MadSkin::default();
+    skin.headers[0] = header(rgb(0x82, 0xaa, 0xff), &[Attribute::Bold, Attribute::Underlined]);
+    skin.headers[1] = header(rgb(0x86, 0xe1, 0xfc), &[Attribute::Bold]);
+    skin.headers[2] = header(rgb(0xc3, 0xe8, 0x8d), &[Attribute::Bold]);
+    skin.headers[3] = header(rgb(0xff, 0xc7, 0x77), &[]);
+    skin.headers[4] = header(rgb(0xff, 0x96, 0x6c), &[Attribute::Italic]);
+    skin.headers[5] = header(rgb(0x63, 0x6d, 0xa6), &[Attribute::Italic]);
+    skin
+}
+
+/// One heading level: a left-aligned line in `fg` carrying `attrs` (and nothing
+/// else — built fresh so the default's blanket underline does not leak in).
+fn header(fg: Color, attrs: &[Attribute]) -> LineStyle {
+    let mut style = CompoundStyle::with_fg(fg);
+    for &attr in attrs {
+        style.add_attr(attr);
+    }
+    LineStyle::new(style, Alignment::Left)
 }
 
 /// Gives a drawn diagram breathing room from the prose above it.

@@ -3,10 +3,11 @@
 //! the [`Component`](super::components::Component) trait; this module only does
 //! the geometry.
 
+use ansi_to_tui::IntoText;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Flex, Layout, Rect};
-use ratatui::text::Line;
-use ratatui::widgets::{Block, Borders};
+use ratatui::text::{Line, Span};
+use ratatui::widgets::Paragraph;
 
 use super::app::App;
 use super::components::Item;
@@ -15,7 +16,7 @@ use super::segment::Segment;
 const MARGIN: u16 = 4;
 const MAX_CONTENT_WIDTH: usize = 100;
 const MIN_CONTENT_WIDTH: usize = 20;
-/// Footer rule line plus a blank row beneath it.
+/// Footer text row plus a blank row beneath it.
 pub(super) const FOOTER_ROWS: u16 = 2;
 
 impl App {
@@ -78,8 +79,10 @@ impl App {
             .collect()
     }
 
-    /// A man-page-style rule with the slide title left and `current/total` right.
-    /// Both ride a top border so `ratatui` handles alignment and truncation.
+    /// A borderless footer: the slide title on the left and `current/total` on
+    /// the right, separated by a flexible spacer. The title is rendered **as-is**
+    /// — interpreting any ANSI escapes it carries — so a deck can pass a fully
+    /// formatted statusline (colors, Nerd Font glyphs) straight from its `title`.
     fn draw_footer(&self, frame: &mut Frame<'_>, area: Rect) {
         if area.height == 0 || area.width == 0 {
             return;
@@ -88,13 +91,42 @@ impl App {
             .footer_title(&self.deck)
             .unwrap_or("");
         let page = format!("{}/{}", self.current + 1, self.deck.slides.len());
-        let rule_area = Rect::new(area.x, area.y, area.width, 1);
-        let footer = Block::new()
-            .borders(Borders::TOP)
-            .title(Line::from(title).left_aligned())
-            .title(Line::from(page).right_aligned());
-        frame.render_widget(footer, rule_area);
+
+        let (mut spans, left_width) = if title.is_empty() {
+            (Vec::new(), 0)
+        } else {
+            (title_spans(title), measure(title))
+        };
+
+        // A spacer pushes the page indicator flush right; both shrink before they
+        // would overlap on a narrow terminal.
+        let page_width = measure(&page);
+        let total = usize::from(area.width);
+        let gap = total.saturating_sub(left_width + page_width).max(1);
+        spans.push(Span::raw(" ".repeat(gap)));
+        spans.push(Span::raw(page));
+
+        // Draw on the footer's last row (a blank row stays above it for breathing
+        // room) so the statusline sits flush at the bottom of the screen.
+        let row = Rect::new(area.x, area.y + area.height - 1, area.width, 1);
+        frame.render_widget(Paragraph::new(Line::from(spans)), row);
     }
+}
+
+/// Parse the title's ANSI into styled spans. A title with no escapes is just one
+/// plain span; a parse failure falls back to the raw text rather than dropping it.
+fn title_spans(title: &str) -> Vec<Span<'static>> {
+    title
+        .into_text()
+        .ok()
+        .and_then(|text| text.lines.into_iter().next())
+        .map_or_else(|| vec![Span::raw(title.to_owned())], |line| line.spans)
+}
+
+/// Display width in cells (ANSI escapes stripped) so the page indicator stays
+/// flush right regardless of any formatting in the title.
+fn measure(text: &str) -> usize {
+    console::measure_text_width(text)
 }
 
 /// Wrap column: terminal minus margins, clamped so content is neither

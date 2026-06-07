@@ -60,7 +60,8 @@ blank lines). Only the `title` attribute is read; any others are ignored.
 # The details
 ```
 
-The footer shows the active title on the left and `current/total` on the right.
+The footer shows the active title as a powerline-style pill on the left and
+`current/total` on the right (no rule line above it).
 
 ## Default content: Markdown
 
@@ -174,4 +175,4 @@ date
 ```
 
 See [`examples/`](../examples/) for complete decks: `showcase.ah-r`,
-`animation.ah-r`, `demo.ah-r`, `nvim.ah-r`.
+`animation.ah-r`, `demo.ah-r`, `nvim.ah-r`, `statusline.ah-r`.

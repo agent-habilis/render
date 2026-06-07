@@ -1,5 +1,7 @@
 use xshell::{Shell, cmd};
 
+pub(crate) mod output;
+
 /// Install `krate` via `cargo install --locked` if the probe command
 /// (`check`) fails. Best-effort: a probe or install hiccup must not abort the
 /// calling task — its own command surfaces a clear error if the tool is
@@ -13,7 +15,7 @@ pub(crate) fn ensure_installed(sh: &Shell, krate: &str, check: &[&str]) {
         .is_ok();
 
     if !ok {
-        eprintln!("=> Installing {krate}...");
+        output::status("Installing", krate);
         let _ = cmd!(sh, "cargo install --locked {krate}").quiet().run();
     }
 }

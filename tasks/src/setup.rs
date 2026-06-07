@@ -3,6 +3,7 @@ use std::path::{Path, PathBuf};
 use xshell::{Shell, cmd};
 
 use crate::TaskOutcome;
+use crate::util::output;
 
 /// Trailing args pass through to the binary's `setup` subcommand, so this is
 /// dry-run unless `--execute` (the binary owns that behavior).
@@ -23,7 +24,7 @@ fn run_ah_r(sh: &Shell, subcommand: &str, args: &[String]) -> TaskOutcome {
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join("Cargo.toml");
-    eprintln!("=> ah-r {subcommand} {}", args.join(" "));
+    output::status("Running", &format!("ah-r {subcommand} {}", args.join(" ")));
     cmd!(sh, "cargo run --quiet --manifest-path {manifest} --bin ah-r -- {subcommand} {args...}")
         .run()?;
     Ok(())

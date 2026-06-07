@@ -1,0 +1,42 @@
+<deck title="Typography" />
+
+# Heading 1
+
+Lorem ipsum dolor sit amet, consectetur adipiscing elit.
+
+## Heading 2
+
+Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+
+### Heading 3
+
+Ut enim ad minim veniam, quis nostrud exercitation ullamco.
+
+#### Heading 4
+
+Duis aute irure dolor in reprehenderit in voluptate velit esse.
+
+##### Heading 5
+
+Excepteur sint occaecat cupidatat non proident, sunt in culpa.
+
+###### Heading 6
+
+Qui officia deserunt mollit anim id est laborum.
+
+---
+
+<slide title="Inline styles" />
+
+# Inline styles
+
+Regular text with **bold**, *italic*, and ***bold italic*** woven in.
+
+You can ~~strike through~~ a mistake, drop in some `inline code`, and link to
+[the repository](https://github.com/agent-habilis/render).
+
+> A blockquote ties it together — with *emphasis* and **strength** inside.
+
+- A list item with **bold**
+- One with a [link](https://mermaid.js.org)
+- One with `inline code` and ~~a cut~~
