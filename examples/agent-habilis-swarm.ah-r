@@ -1,0 +1,15 @@
+<deck title="[38;2;130;170;255m[0m[48;2;130;170;255m[38;2;27;29;43m lorem ipsum [0m[38;2;130;170;255m[0m" pagination="[38;2;195;232;141m[0m[48;2;195;232;141m[38;2;27;29;43m {cur}/{total} [0m[38;2;195;232;141m[0m" />
+
+# Pill statusline
+
+The footer `title` is rendered as-is, so a deck can hand it a fully formatted
+pill — Nerd Font powerline caps wrapping an ANSI-colored label — straight from
+the frontmatter. Look at the bottom-left corner.
+
+---
+
+## Flexible titles
+
+The renderer never builds the pill; the `title` string itself carries the Nerd
+Font glyphs and ANSI color. `current/total` rides the bottom-right, and there
+is no rule line above the footer.

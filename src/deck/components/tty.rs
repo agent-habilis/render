@@ -370,6 +370,13 @@ impl ProcessManager {
         self.ephemeral.retain(|(slide, _), _| *slide == current);
     }
 
+    /// Drop prerendered processes for slides `>= slides`. Prerendered procs are
+    /// session-lifetime and untouched by [`Self::reconcile`], so a live reload
+    /// that shrinks the deck would otherwise leak the ones past the new end.
+    pub(crate) fn retain_prerendered_below(&mut self, slides: usize) {
+        self.prerendered.retain(|(slide, _), _| *slide < slides);
+    }
+
     /// Spawn the missing processes for slide `current` and resize/poll the rest.
     pub(crate) fn ensure(
         &mut self,

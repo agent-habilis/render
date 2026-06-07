@@ -175,3 +175,66 @@ fn run_deck_to_quit(contents: &str) -> (bool, String) {
     let text = String::from_utf8_lossy(&output.lock().expect("lock output")).into_owned();
     (status.success(), text)
 }
+
+#[test]
+fn watched_deck_reloads_on_change() {
+    let path = temp_deck("# First Heading\n", "ah-r");
+
+    let pair = native_pty_system()
+        .openpty(PtySize {
+            rows: 30,
+            cols: 100,
+            pixel_width: 0,
+            pixel_height: 0,
+        })
+        .expect("open pty");
+
+    let mut cmd = CommandBuilder::new(AH_R);
+    cmd.arg(&path);
+    cmd.arg("--watch");
+    cmd.env("TERM", "xterm-256color");
+    cmd.env("AH_R_NO_IMAGE_QUERY", "1");
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn ah-r");
+    drop(pair.slave);
+
+    let output = Arc::new(Mutex::new(Vec::new()));
+    let sink = Arc::clone(&output);
+    let mut reader = pair.master.try_clone_reader().expect("clone reader");
+    let reader_thread = std::thread::spawn(move || {
+        let mut chunk = [0u8; 8192];
+        while let Ok(read) = reader.read(&mut chunk) {
+            if read == 0 {
+                break;
+            }
+            sink.lock().expect("lock output").extend_from_slice(&chunk[..read]);
+        }
+    });
+
+    let mut writer = pair.master.take_writer().expect("take writer");
+    std::thread::sleep(Duration::from_millis(700));
+    // Rewrite the watched file; the ~10 Hz poll should pick up the new mtime.
+    std::fs::write(&path, "# Reloaded Heading\n").expect("rewrite deck");
+    std::thread::sleep(Duration::from_millis(800));
+    writer.write_all(b"q").and_then(|()| writer.flush()).expect("send quit");
+
+    let mut killer = child.clone_killer();
+    let watchdog = std::thread::spawn(move || {
+        std::thread::sleep(Duration::from_secs(6));
+        let _ = killer.kill();
+    });
+
+    let status = child.wait().expect("wait for ah-r");
+    drop(pair.master);
+    reader_thread.join().expect("join reader");
+    let _ = watchdog.join();
+    let _ = std::fs::remove_file(&path);
+
+    assert!(status.success(), "watched deck should exit cleanly on `q`, got {status:?}");
+    let bytes = output.lock().expect("lock output");
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("First Heading"), "initial slide should render");
+    assert!(
+        text.contains("Reloaded Heading"),
+        "the edited slide should appear after reload"
+    );
+}

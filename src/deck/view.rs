@@ -1,8 +1,9 @@
 use ansi_to_tui::IntoText;
 use ratatui::Frame;
-use ratatui::layout::{Constraint, Flex, Layout, Rect};
+use ratatui::layout::{Alignment, Constraint, Flex, Layout, Rect};
+use ratatui::style::{Color, Style};
 use ratatui::text::{Line, Span};
-use ratatui::widgets::Paragraph;
+use ratatui::widgets::{Clear, Paragraph, Wrap};
 
 use super::app::App;
 use super::components::{Align, Item, Placement};
@@ -164,6 +165,34 @@ fn measure(text: &str) -> usize {
 pub(super) fn content_width(cols: u16) -> usize {
     let usable = usize::from(cols.saturating_sub(MARGIN * 2));
     usable.clamp(MIN_CONTENT_WIDTH, MAX_CONTENT_WIDTH)
+}
+
+/// Full-screen reload-error message (live reload), centered and red, replacing
+/// the slide while the watched file fails to parse. `Clear` wipes the prior
+/// slide's content — including any terminal graphics — first.
+pub(super) fn draw_error(frame: &mut Frame<'_>, message: &str) {
+    let area = frame.area();
+    frame.render_widget(Clear, area);
+    if area.width == 0 || area.height == 0 {
+        return;
+    }
+    let text = format!("⚠ reload error\n\n{message}");
+    // Estimate wrapped height so the block sits vertically centered.
+    let width = usize::from(area.width);
+    let lines: u16 = text
+        .lines()
+        .map(|line| console::measure_text_width(line).max(1).div_ceil(width))
+        .sum::<usize>()
+        .try_into()
+        .unwrap_or(u16::MAX);
+    let [middle] = Layout::vertical([Constraint::Length(lines.min(area.height))])
+        .flex(Flex::Center)
+        .areas(area);
+    let para = Paragraph::new(text)
+        .alignment(Alignment::Center)
+        .wrap(Wrap { trim: false })
+        .style(Style::new().fg(Color::Red));
+    frame.render_widget(para, middle);
 }
 
 /// Place a free-floating item of width `item_w` in `cell`: `Left`/`Right` hug the

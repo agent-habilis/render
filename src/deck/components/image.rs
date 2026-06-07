@@ -151,6 +151,13 @@ impl ImageStore {
         }
     }
 
+    /// Drop every decoded image so a reload re-decodes with fresh content (the
+    /// `(slide, index)` keys would otherwise serve a stale image once edits shift
+    /// slides).
+    pub(crate) fn clear(&self) {
+        self.loaded.borrow_mut().clear();
+    }
+
     /// Decode (once) every `<img>` on slide `current` that isn't loaded yet.
     pub(crate) fn ensure(&self, current: usize, segments: &[Segment]) {
         let mut loaded = self.loaded.borrow_mut();

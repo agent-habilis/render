@@ -20,6 +20,16 @@ Navigate with the arrow keys; press `q` to quit.
 | First / last slide | `Home` `g` / `End` `G` |
 | Quit | `q` `Esc` `Ctrl-C` |
 
+## Live reload (`--watch`)
+
+`ah-r slides.ah-r --watch` watches the file and re-renders on every save, so you
+can edit and preview in a tight loop. It keeps your place (the current page) and
+leaves any running `<tty>` processes alive across the reload. If the page you're
+on no longer exists — e.g. you deleted the last few slides — it drops to the new
+last slide. While the file is mid-edit and doesn't parse (an unclosed tag, two
+`<deck>` tags), it shows the parse error and resumes once the file is valid
+again. Off unless `--watch` is given.
+
 ## Slides
 
 Slides are separated by a standalone `---` line:

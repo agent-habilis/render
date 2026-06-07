@@ -15,8 +15,8 @@ terminal text**, choosing the renderer from the file's extension:
   terminal — via [`comfy-table`](https://crates.io/crates/comfy-table).
 - **Decks** (`.ah-r`) as a full-screen terminal presentation — Markdown slides
   with embedded code, diagrams, live shells, animations, and images (drawn with
-  the terminal's kitty/iTerm2/Sixel graphics protocol). See
-  [the deck format](docs/deck-format.md).
+  the terminal's kitty/iTerm2/Sixel graphics protocol). `--watch` live-reloads
+  the deck as you edit it. See [the deck format](docs/deck-format.md).
 - **Images** (`.png`, `.jpg`, `.jpeg`, `.gif`, `.webp`) drawn inline with the
   terminal's kitty/iTerm2/Sixel graphics protocol (Unicode halfblocks as a
   fallback), via [`ratatui-image`](https://crates.io/crates/ratatui-image). The

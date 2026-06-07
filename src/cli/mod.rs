@@ -2,7 +2,7 @@ mod args;
 mod setup;
 
 use std::io::{IsTerminal, Write};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
@@ -25,7 +25,7 @@ pub fn run_cli() -> Result<()> {
             let path = cli
                 .path
                 .ok_or_else(|| anyhow::anyhow!("no input file given"))?;
-            render_file(&path)
+            render_file(&path, cli.watch)
         }
     }
 }
@@ -57,7 +57,7 @@ fn format_for_extension(path: &Path) -> Option<Format> {
     }
 }
 
-fn render_file(path: &Path) -> Result<()> {
+fn render_file(path: &Path, watch: bool) -> Result<()> {
     // Resolve the renderer before reading, so a bad extension fails fast.
     let Some(format) = format_for_extension(path) else {
         bail!(
@@ -102,10 +102,7 @@ fn render_file(path: &Path) -> Result<()> {
                     path.display()
                 );
             }
-            let base_dir = path
-                .parent()
-                .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-            return deck::run(&input, base_dir);
+            return deck::run(&input, path, watch);
         }
         // Images are binary and return before the text read above.
         Format::Image => unreachable!("images are handled before read_to_string"),

@@ -18,6 +18,10 @@ pub(crate) struct Cli {
     /// `.mmd`/`.mermaid` → Mermaid diagram, `.md`/`.markdown` → Markdown,
     /// `.csv`/`.tsv` → table, `.ah-r` → full-screen presentation.
     pub(super) path: Option<PathBuf>,
+    /// Live-reload a `.ah-r` deck: watch the file and re-render on save, keeping
+    /// your place and any running `<tty>` processes. Ignored for other formats.
+    #[arg(long)]
+    pub(super) watch: bool,
     #[command(subcommand)]
     pub(super) command: Option<Command>,
 }
