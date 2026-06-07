@@ -1,24 +1,41 @@
 //! The `ahr` command-line interface: the argument shape ([`args`]) and the
-//! [`run_cli`] entry point. `ahr` reads the file given as its positional
-//! argument and writes text to stdout; the file's extension selects the renderer.
+//! [`run_cli`] entry point. With no subcommand `ahr` reads the file given as its
+//! positional argument and writes the rendered text to stdout (the extension
+//! selects the renderer); the `setup`/`teardown` subcommands manage the embedded
+//! `/render` agent skill (see [`setup`]).
 
 mod args;
+mod setup;
 
 use std::io::{IsTerminal, Write};
+use std::path::Path;
 
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
 use crate::{deck, markdown, mermaid};
-use args::Cli;
+use args::{Cli, Command};
 
-/// Parse `argv`, read the input file argument, render it, and write to stdout.
+/// Parse `argv` and run the selected command — render a file (default), or
+/// install/remove the `/render` skill.
 ///
 /// # Errors
 /// An unsupported/missing extension, a file that can't be read (not found,
-/// permission, non-UTF-8), empty contents, or a rendering error.
+/// permission, non-UTF-8), empty contents, a rendering error, or a filesystem
+/// error while installing/removing the skill.
 pub fn run_cli() -> Result<()> {
-    dispatch(Cli::parse())
+    let cli = Cli::parse();
+    match cli.command {
+        Some(Command::Setup { execute, agents }) => setup::setup(execute, &agents),
+        Some(Command::Teardown { execute, agents }) => setup::teardown(execute, &agents),
+        // `arg_required_else_help` guarantees a path when there is no subcommand.
+        None => {
+            let path = cli
+                .path
+                .ok_or_else(|| anyhow::anyhow!("no input file given"))?;
+            render_file(&path)
+        }
+    }
 }
 
 /// Which renderer to drive, resolved from the input file's extension.
@@ -29,7 +46,7 @@ enum Format {
     Deck,
 }
 
-fn format_for_extension(path: &std::path::Path) -> Option<Format> {
+fn format_for_extension(path: &Path) -> Option<Format> {
     match path
         .extension()
         .and_then(|ext| ext.to_str())
@@ -43,18 +60,16 @@ fn format_for_extension(path: &std::path::Path) -> Option<Format> {
     }
 }
 
-fn dispatch(cli: Cli) -> Result<()> {
-    let Cli { path } = cli;
-
+fn render_file(path: &Path) -> Result<()> {
     // Resolve the renderer before reading, so a bad extension fails fast.
-    let Some(format) = format_for_extension(&path) else {
+    let Some(format) = format_for_extension(path) else {
         bail!(
             "unsupported input file `{}`: expected a .mmd/.mermaid, .md/.markdown, or .ah-r extension",
             path.display()
         );
     };
 
-    let input = std::fs::read_to_string(&path)
+    let input = std::fs::read_to_string(path)
         .with_context(|| format!("failed to read `{}`", path.display()))?;
 
     if input.trim().is_empty() {

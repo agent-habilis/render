@@ -9,6 +9,7 @@ mod fmt;
 mod install;
 mod lint;
 mod release;
+mod setup;
 mod test;
 mod util;
 
@@ -46,6 +47,18 @@ enum Task {
         #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
         args: Vec<String>,
     },
+    /// Install the `/render` agent skill (forwards to `ahr setup`; dry run
+    /// unless `--execute`). Pass flags after `--`, e.g. `-- --execute`.
+    Setup {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
+    /// Remove the `/render` agent skill (forwards to `ahr teardown`; dry run
+    /// unless `--execute`).
+    Teardown {
+        #[arg(trailing_var_arg = true, allow_hyphen_values = true)]
+        args: Vec<String>,
+    },
 }
 
 fn main() -> ExitCode {
@@ -66,6 +79,8 @@ fn main() -> ExitCode {
         Task::Clean => clean::run(&sh),
         Task::Install => install::run(&sh),
         Task::Release { args } => release::run(&sh, &args),
+        Task::Setup { args } => setup::setup(&sh, &args),
+        Task::Teardown { args } => setup::teardown(&sh, &args),
     };
 
     match outcome {
