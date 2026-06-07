@@ -1,6 +1,3 @@
-//! The Markdown type: a document styled for the terminal, with any embedded
-//! ` ```mermaid ` blocks drawn inline.
-
 use std::io::IsTerminal;
 use std::ops::Range;
 

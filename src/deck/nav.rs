@@ -1,5 +1,3 @@
-//! Decoding key presses into slide navigation intents.
-
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 #[derive(Debug, Clone, Copy)]

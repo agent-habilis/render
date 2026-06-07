@@ -1,10 +1,3 @@
-//! The renderable pieces a slide is built from. Each component lives in its own
-//! module and owns its data, its attribute parsing, and how it renders. They
-//! share the [`Component`] trait (pre-render + layout policy), the [`Cached`]
-//! render representation, and the [`measured_text`]/[`tokenize_attrs`] helpers.
-//! The deck runtime ([`crate::deck`]) dispatches to them via
-//! [`crate::deck::Segment`].
-
 use std::time::Duration;
 
 use ansi_to_tui::IntoText;

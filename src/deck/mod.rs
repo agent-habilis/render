@@ -1,7 +1,3 @@
-//! The `.ah-r` deck type: parsing ([`model`], [`segment`]), the interactive
-//! runtime ([`app`], [`view`], [`nav`]), `<code>` highlighting ([`highlight`]),
-//! and the slide [`components`] — all used only by the deck.
-
 mod app;
 mod components;
 mod highlight;

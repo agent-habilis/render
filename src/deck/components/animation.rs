@@ -1,6 +1,3 @@
-//! The `<animation>` component: a flipbook of literal `<frame>`s, advanced on a
-//! per-slide clock and optionally looping.
-
 use std::time::Duration;
 
 use ansi_to_tui::IntoText;

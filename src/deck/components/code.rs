@@ -1,6 +1,3 @@
-//! The `<code>` component: source rendered with static syntax highlighting (via
-//! [`crate::deck::highlight_code`]). Borderless — just the highlighted code.
-
 use super::{Cached, Component, measured_text, tokenize_attrs};
 use crate::deck;
 

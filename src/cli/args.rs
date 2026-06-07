@@ -1,12 +1,9 @@
-//! The clap-derived argument shape for the `ah-r` command.
-
 use std::path::PathBuf;
 
 use clap::{Parser, Subcommand};
 
 use super::setup::Agent;
 
-/// Render a diagram or document file as terminal text.
 #[derive(Parser, Debug)]
 #[command(
     name = "ah-r",
@@ -25,7 +22,6 @@ pub(crate) struct Cli {
     pub(super) command: Option<Command>,
 }
 
-/// Subcommands beyond the default file render.
 #[derive(Subcommand, Debug)]
 pub(crate) enum Command {
     /// Install the `/render` agent skill into your agents.

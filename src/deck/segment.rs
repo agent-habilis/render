@@ -1,6 +1,3 @@
-//! Slide segments: splitting a slide body into its embedded components and the
-//! Markdown runs around them.
-
 use super::components::{
     AnimationComponent, CodeComponent, Component, MarkdownComponent, MermaidComponent, TtyComponent,
 };

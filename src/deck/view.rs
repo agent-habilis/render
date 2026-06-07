@@ -1,8 +1,3 @@
-//! Drawing the current slide: a vertically-centered stack of laid-out
-//! components plus the footer. Components measure and draw themselves through
-//! the [`Component`](super::components::Component) trait; this module only does
-//! the geometry.
-
 use ansi_to_tui::IntoText;
 use ratatui::Frame;
 use ratatui::layout::{Constraint, Flex, Layout, Rect};

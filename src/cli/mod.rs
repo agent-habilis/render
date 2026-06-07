@@ -1,9 +1,3 @@
-//! The `ah-r` command-line interface: the argument shape ([`args`]) and the
-//! [`run_cli`] entry point. With no subcommand `ah-r` reads the file given as its
-//! positional argument and writes the rendered text to stdout (the extension
-//! selects the renderer); the `setup`/`teardown` subcommands manage the embedded
-//! `/render` agent skill (see [`setup`]).
-
 mod args;
 mod setup;
 

@@ -1,7 +1,3 @@
-//! The `<mermaid>` component: its source drawn as a Unicode diagram (via
-//! [`crate::mermaid::mermaid`]), falling back to the raw source if it can't be
-//! drawn.
-
 use super::{Cached, Component, measured_text};
 use crate::mermaid;
 

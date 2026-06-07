@@ -1,10 +1,3 @@
-//! The deck runtime: parses the deck, takes over the terminal, and drives the
-//! [`App`] loop. The loop is tick-driven rather than blocking: between key
-//! presses it repaints so a running `<tty>` process streams live and the status
-//! indicator blinks. Time-independent segments are rendered once per slide+width
-//! and cached (see [`StaticRender`]). Drawing lives in [`super::view`],
-//! navigation in [`super::nav`].
-
 use std::time::{Duration, Instant};
 
 use anyhow::{Result, bail};

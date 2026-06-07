@@ -1,32 +1,3 @@
-//! Live process execution for `<tty>` components.
-//!
-//! Each component runs a shell command in a real pseudo-terminal ([`portable_pty`]),
-//! so programs see a TTY and emit colors / full-screen redraws as usual. A
-//! per-process reader thread feeds the raw bytes into a [`vt100`] parser that
-//! maintains a virtual screen grid; the deck runtime paints that grid into a
-//! bordered box (see [`super`]).
-//!
-//! A component may carry `keys=` — keystrokes fed into the process shortly after it
-//! starts (decoded by [`decode_keys`]), useful to drive a TUI from a slide, e.g.
-//! to dismiss an editor's startup popups. The deck runtime never *reads* the
-//! PTY, so `keys` is a fixed startup script, not interactivity.
-//!
-//! [`ProcessManager`] owns the running processes and implements the cross-slide
-//! lifecycle:
-//!
-//! - **Ephemeral** processes (no `id`, or no `persist`) are keyed by their
-//!   `(slide, component)` position and killed when that slide stops being current.
-//! - **Persistent** processes (`persist` *and* an `id`) are keyed by `id` and
-//!   survive a slide change only when the destination slide reuses that `id` —
-//!   then the same process (and its accumulated output) is re-mounted.
-//! - **Prerendered** processes (`prerender`) are spawned at deck load, keyed by
-//!   their `(slide, component)` position, and kept alive for the whole session, so
-//!   a slow-starting program is already drawn when its slide is reached.
-//!
-//! A [`ManagedProc`] kills its child on [`Drop`], so dropping it from either map
-//! (via [`ProcessManager::reconcile`]) or dropping the whole manager tears the
-//! process down.
-
 use std::collections::{HashMap, HashSet};
 use std::io::{Read, Write};
 use std::sync::{Arc, Mutex, MutexGuard};

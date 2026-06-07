@@ -1,14 +1,3 @@
-//! Parse an `.ah-r` file into a [`Deck`] of [`Slide`]s.
-//!
-//! A deck is a Markdown file with embedded XML islands. Standalone `---` lines
-//! separate slides; a `<deck title="…" pagination="…" />` self-closing tag (deck
-//! level, anywhere a slide may start) carries frontmatter. The XML components —
-//! `<code>`, `<tty>`, `<mermaid>`, `<animation>` — express what Markdown cannot;
-//! see [`Segment`].
-//!
-//! Splitting is fence- and component-aware: a `---` inside a code fence or a
-//! component is content, not a separator.
-
 use anyhow::{Result, bail};
 
 use super::components::tokenize_attrs;

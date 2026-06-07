@@ -1,12 +1,3 @@
-//! Static syntax highlighting for `<code>` blocks.
-//!
-//! [`highlight_code`] turns a fenced code sample into true-color ANSI using
-//! [`syntect`]: the syntaxes come from [`two_face`] (bat's bundled set, so Rust,
-//! TOML, and friends are covered, unlike syntect's leaner defaults), and the
-//! theme is a vendored Tokyo Night Moon `TextMate` scheme so the slides match a
-//! `TokyoNight` Moon terminal. The emitted escapes flow through the same
-//! `ansi_to_tui` path the rest of the renderer uses (see [`super`]).
-
 use std::sync::LazyLock;
 
 use syntect::easy::HighlightLines;

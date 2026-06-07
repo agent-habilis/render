@@ -1,9 +1,3 @@
-//! The Table type: a delimited-data file (CSV/TSV) drawn as a terminal grid.
-//!
-//! The first record is the header; every row and column is separated by a solid
-//! single line and the outer corners are rounded. Cells wrap to the available
-//! width so a wide table never loses content.
-
 use std::io::IsTerminal;
 
 use comfy_table::{Attribute, Cell, CellAlignment, ContentArrangement, Table};
@@ -89,7 +83,6 @@ fn sanitize(field: &str) -> String {
         .collect()
 }
 
-/// Pad a row up to `columns` with empty cells.
 fn padded(mut row: Vec<String>, columns: usize) -> Vec<String> {
     row.resize(columns, String::new());
     row

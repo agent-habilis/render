@@ -1,7 +1,3 @@
-//! End-to-end tests for the `.ah-r` presentation format, driving the real `ah-r`
-//! binary. A deck only runs in an interactive terminal, so the rendering path is
-//! exercised through a pseudo-terminal.
-
 use std::io::{Read, Write};
 use std::path::PathBuf;
 use std::process::Command;

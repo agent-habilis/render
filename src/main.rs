@@ -1,8 +1,3 @@
-//! Thin binary shim. All CLI logic lives in the library
-//! ([`agent_habilis_render::run_cli`]); `main` owns only the process exit
-//! code. The tool reads the file given as its argument and writes text to
-//! stdout, so there is no async runtime or terminal state to manage here.
-
 use anyhow::Result;
 
 fn main() -> Result<()> {

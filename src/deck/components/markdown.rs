@@ -1,6 +1,3 @@
-//! The default prose component: a run of Markdown, rendered plainly (a ` ``` `
-//! fence is just a styled code block — diagrams come from `<mermaid>`).
-
 use super::{Cached, Component, measured_text};
 use crate::markdown;
 

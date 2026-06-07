@@ -1,7 +1,3 @@
-//! End-to-end tests for the `.csv`/`.tsv` table format, driving the real `ah-r`
-//! binary. These run with stdout captured (not a TTY), so the renderer uses its
-//! deterministic 80-column, no-ANSI path.
-
 use std::path::PathBuf;
 use std::process::Command;
 

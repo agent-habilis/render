@@ -1,9 +1,3 @@
-//! `ah-r setup` / `ah-r teardown`: install or remove the `/render` agent skill
-//! across agents. The skill's `SKILL.md` is embedded at compile time, so a
-//! brew/cargo-installed binary carries it with no repo checkout. Both commands
-//! are dry-run by default; `--execute` mutates. Agent selection is flag-driven
-//! (`--agent`), defaulting to the agents detected on this machine.
-
 use std::path::{Path, PathBuf};
 
 use anyhow::{Context, Result, bail};
