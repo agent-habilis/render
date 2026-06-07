@@ -7,7 +7,7 @@ use std::path::Path;
 use anyhow::{Context, Result, bail};
 use clap::Parser;
 
-use crate::{deck, imageview, markdown, mermaid, table};
+use crate::{deck, img, markdown, mermaid, table};
 use args::{Cli, Command};
 
 /// Render a file (default), or install/remove the `/render` skill.
@@ -77,7 +77,7 @@ fn render_file(path: &Path, watch: bool) -> Result<()> {
                 path.display()
             );
         }
-        return imageview::render(path);
+        return img::render(path);
     }
 
     let input = std::fs::read_to_string(path)

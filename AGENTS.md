@@ -2,6 +2,25 @@
 
 Guidance for AI agents working in this repository.
 
+## Architecture
+
+`ah-r` renders an input file as terminal text, picking a renderer from the file
+extension. The layout follows from that:
+
+- **One module folder per rendered type.** Each supported type lives in its own
+  `src/<type>/mod.rs` (`markdown`, `mermaid`, `table`, `deck`, `img`, …)
+  exposing a single `pub(crate)` entry function. `src/cli/mod.rs` maps each
+  extension to one of them.
+- **A type's helpers live inside that type's module**, not in a loose file. The
+  `src/` root holds only `main.rs`, `lib.rs`, `cli/`, and the type folders — do
+  not drop a `src/foo.rs` helper file next to them.
+- **Deck components reuse the top-level type modules.** A `<...>` block in
+  `src/deck/components/` calls into `crate::mermaid`, `crate::img`, etc.
+  rather than duplicating that type's rendering logic.
+
+When adding a new rendered type, add a `src/<type>/` folder and wire its
+extension into `src/cli/mod.rs`; do not introduce a parallel top-level file.
+
 ## Comments
 
 This codebase keeps comments sparse. Follow these rules:
