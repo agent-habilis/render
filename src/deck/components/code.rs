@@ -1,5 +1,5 @@
 use super::{Align, Cached, Component, measured_text, parse_align, tokenize_attrs};
-use crate::deck;
+use crate::markdown;
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub(crate) struct CodeComponent {
@@ -25,7 +25,7 @@ impl CodeComponent {
 
 impl Component for CodeComponent {
     fn render(&self, _content_w: usize) -> Cached {
-        let (text, width, height) = measured_text(&deck::highlight_code(&self.lang, &self.code));
+        let (text, width, height) = measured_text(&markdown::render_code(&self.lang, &self.code));
         Cached::Static(text, width, height)
     }
 

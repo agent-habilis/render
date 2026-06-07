@@ -25,6 +25,12 @@ extension into `src/cli/mod.rs`; do not introduce a parallel top-level file.
 
 This codebase keeps comments sparse. Follow these rules:
 
+- **Default to none.** Assume no comment. Add one only if a competent reader
+  would otherwise misread the code or miss a non-obvious gotcha. Narrating
+  intent or design the names and values already convey — "so it blends with the
+  theme", "give it breathing room", "the only fills are…" — is not a *why*; cut
+  it. A good *why* names a consequence you can't see locally: a crate quirk, an
+  ordering constraint, a bug it prevents.
 - **Only explain *why*.** A comment must add what the code cannot say on its
   own — rationale, a trade-off, a non-obvious constraint, or a gotcha that would
   trip up the next reader. If a comment merely restates what the code plainly
