@@ -59,3 +59,10 @@ Present the rendered output to the user **verbatim** — exactly as `ah-r` emitt
 it, byte for byte, with no edits, reformatting, re-wrapping, summarizing, or
 "cleaning up". The rendered text *is* the deliverable; altering it defeats the
 rendering. For a deck, hand control back to the user to navigate.
+
+**Do not narrate the output.** Emit only the rendered block — no commentary,
+interpretation, summary, or explanation of what the diagram/table/document
+"shows", before or after it. The user can read it themselves. For example, after
+rendering a class diagram, do **not** add a line like "This is the Animal base
+class with Dog and Cat inheriting from it (the ─◁ arrows point back to the
+parent)."
