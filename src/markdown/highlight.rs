@@ -19,7 +19,11 @@ static THEME: LazyLock<Theme> = LazyLock::new(|| {
 const RESET: &str = "\x1b[0m";
 
 fn box_style() -> String {
-    format!("{}{}", SetForegroundColor(FG), SetBackgroundColor(INLINE_BG))
+    format!(
+        "{}{}",
+        SetForegroundColor(FG),
+        SetBackgroundColor(INLINE_BG)
+    )
 }
 
 pub(crate) fn render_code(lang: &str, code: &str) -> String {
@@ -33,7 +37,10 @@ pub(crate) fn render_code(lang: &str, code: &str) -> String {
 }
 
 fn code_box(syntax: Option<&SyntaxReference>, syntaxes: &SyntaxSet, code: &str) -> String {
-    let lines: Vec<String> = trimmed_lines(code).iter().map(|&line| expand_tabs(line)).collect();
+    let lines: Vec<String> = trimmed_lines(code)
+        .iter()
+        .map(|&line| expand_tabs(line))
+        .collect();
     let inner = lines
         .iter()
         .map(|line| console::measure_text_width(line))
@@ -133,7 +140,10 @@ mod tests {
         let out = render_code("rust", "fn main() {}\n");
         assert!(out.contains("\x1b[38;2;"), "expected 24-bit color escapes");
         assert!(out.contains("fn"), "source text must survive highlighting");
-        assert!(out.contains("48;2;47;51;77"), "highlighted code sits in the box too");
+        assert!(
+            out.contains("48;2;47;51;77"),
+            "highlighted code sits in the box too"
+        );
         assert!(out.ends_with("\x1b[0m"), "must end with a reset");
     }
 
@@ -141,7 +151,10 @@ mod tests {
     fn unknown_language_renders_a_generic_box() {
         let out = render_code("definitely-not-a-language", "just some text\n");
         assert!(out.contains("just some text"), "text must survive");
-        assert!(out.contains("48;2;47;51;77"), "generic box uses the brighter bg fill");
+        assert!(
+            out.contains("48;2;47;51;77"),
+            "generic box uses the brighter bg fill"
+        );
     }
 
     #[test]

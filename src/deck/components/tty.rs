@@ -84,7 +84,9 @@ impl super::Component for TtyComponent {
                 box_interior(
                     self,
                     ctx.content.height.saturating_sub(2),
-                    u16::try_from(ctx.content_w).unwrap_or(u16::MAX).saturating_sub(2),
+                    u16::try_from(ctx.content_w)
+                        .unwrap_or(u16::MAX)
+                        .saturating_sub(2),
                 )
             },
             ManagedProc::interior,
@@ -172,7 +174,11 @@ impl ManagedProc {
             std::thread::spawn(move || {
                 for delay in KEYS_DELAYS {
                     std::thread::sleep(Duration::from_millis(*delay));
-                    if writer.write_all(&keys).and_then(|()| writer.flush()).is_err() {
+                    if writer
+                        .write_all(&keys)
+                        .and_then(|()| writer.flush())
+                        .is_err()
+                    {
                         break;
                     }
                 }
@@ -404,7 +410,9 @@ impl ProcessManager {
                 if let Some(proc) = self.prerendered.get_mut(&key) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
+                } else if let Ok(mut proc) =
+                    ManagedProc::spawn(&component.command, keys, rows, cols)
+                {
                     proc.poll();
                     self.prerendered.insert(key, proc);
                 }
@@ -412,7 +420,9 @@ impl ProcessManager {
                 if let Some(proc) = self.persistent.get_mut(id) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
+                } else if let Ok(mut proc) =
+                    ManagedProc::spawn(&component.command, keys, rows, cols)
+                {
                     proc.poll();
                     self.persistent.insert(id.to_owned(), proc);
                 }
@@ -421,7 +431,9 @@ impl ProcessManager {
                 if let Some(proc) = self.ephemeral.get_mut(&key) {
                     proc.resize(rows, cols);
                     proc.poll();
-                } else if let Ok(mut proc) = ManagedProc::spawn(&component.command, keys, rows, cols) {
+                } else if let Ok(mut proc) =
+                    ManagedProc::spawn(&component.command, keys, rows, cols)
+                {
                     proc.poll();
                     self.ephemeral.insert(key, proc);
                 }
@@ -470,7 +482,6 @@ impl ProcessManager {
             None => self.ephemeral.get(&(current, index)),
         }
     }
-
 }
 
 pub(crate) fn draw_tty(
@@ -542,8 +553,8 @@ fn keep_persistent_ids(segments: &[Segment]) -> HashSet<String> {
 
 #[cfg(test)]
 mod tests {
-    use super::{box_interior, decode_keys, keep_persistent_ids, persistent_id};
     use super::TtyComponent;
+    use super::{box_interior, decode_keys, keep_persistent_ids, persistent_id};
     use crate::deck::Segment;
 
     fn component(id: Option<&str>, persist: bool) -> TtyComponent {

@@ -87,7 +87,11 @@ pub(crate) fn scale(value: u16, mul: u16, div: u16) -> u16 {
 pub(crate) fn fit_aspect(natural: Size, max_w: u16, max_h: u16, allow_upscale: bool) -> Size {
     let (nat_w, nat_h) = (natural.width.max(1), natural.height.max(1));
     let (max_w, max_h) = (max_w.max(1), max_h.max(1));
-    let width = if allow_upscale { max_w } else { nat_w.min(max_w) };
+    let width = if allow_upscale {
+        max_w
+    } else {
+        nat_w.min(max_w)
+    };
     let by_width = Size::new(width, scale(width, nat_h, nat_w));
     if by_width.height <= max_h {
         by_width
@@ -111,17 +115,32 @@ mod tests {
 
     #[test]
     fn shrink_only_never_upscales() {
-        assert_eq!(fit_aspect(Size::new(100, 50), 40, 100, false), Size::new(40, 20));
+        assert_eq!(
+            fit_aspect(Size::new(100, 50), 40, 100, false),
+            Size::new(40, 20)
+        );
         // Height is the binding cap.
-        assert_eq!(fit_aspect(Size::new(100, 50), 100, 10, false), Size::new(20, 10));
+        assert_eq!(
+            fit_aspect(Size::new(100, 50), 100, 10, false),
+            Size::new(20, 10)
+        );
         // Smaller than the box stays at natural size.
-        assert_eq!(fit_aspect(Size::new(10, 6), 100, 100, false), Size::new(10, 6));
+        assert_eq!(
+            fit_aspect(Size::new(10, 6), 100, 100, false),
+            Size::new(10, 6)
+        );
     }
 
     #[test]
     fn upscale_fills_the_box_keeping_aspect() {
-        assert_eq!(fit_aspect(Size::new(100, 50), 200, 200, true), Size::new(200, 100));
+        assert_eq!(
+            fit_aspect(Size::new(100, 50), 200, 200, true),
+            Size::new(200, 100)
+        );
         // A 30x30 box on a 2:1 image yields 30x15 (fit inside, not stretched).
-        assert_eq!(fit_aspect(Size::new(100, 50), 30, 30, true), Size::new(30, 15));
+        assert_eq!(
+            fit_aspect(Size::new(100, 50), 30, 30, true),
+            Size::new(30, 15)
+        );
     }
 }

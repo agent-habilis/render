@@ -187,7 +187,11 @@ fn fenced_blocks(input: &str) -> Vec<(Range<usize>, &str, &str)> {
 /// `None` for a non-fence line or a 4+ backtick line. Only the first token
 /// counts, e.g. `rust` in ` ```rust ignore `.
 fn open_fence(trimmed: &str) -> Option<&str> {
-    let lang = trimmed.strip_prefix("```")?.split_whitespace().next().unwrap_or("");
+    let lang = trimmed
+        .strip_prefix("```")?
+        .split_whitespace()
+        .next()
+        .unwrap_or("");
     (!lang.contains('`')).then_some(lang)
 }
 
@@ -214,7 +218,10 @@ mod tests {
     #[test]
     fn language_tagged_fence_is_syntax_highlighted() {
         let out = markdown("```rust\nfn main() {}\n```\n");
-        assert!(out.contains("\u{1b}[38;2;"), "expected 24-bit color escapes");
+        assert!(
+            out.contains("\u{1b}[38;2;"),
+            "expected 24-bit color escapes"
+        );
         assert!(out.contains("fn"), "source text must survive highlighting");
     }
 
@@ -222,6 +229,9 @@ mod tests {
     fn untagged_fence_renders_a_generic_box() {
         let out = markdown("```\nplain text\n```\n");
         assert!(out.contains("plain text"));
-        assert!(out.contains("48;2;47;51;77"), "untagged fence → generic box");
+        assert!(
+            out.contains("48;2;47;51;77"),
+            "untagged fence → generic box"
+        );
     }
 }

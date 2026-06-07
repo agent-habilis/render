@@ -3,17 +3,17 @@ use std::path::{Path, PathBuf};
 use std::time::{Duration, Instant, SystemTime};
 
 use anyhow::{Result, bail};
+use ratatui::DefaultTerminal;
 use ratatui::crossterm::event::{self, Event, KeyEventKind};
 use ratatui::layout::{Rect, Size};
-use ratatui::DefaultTerminal;
 use ratatui_image::picker::Picker;
 
+use super::components::tty::ProcessManager;
+use super::components::{Cached, FrameCtx, ImageStore};
 use super::model::{Deck, parse_deck};
 use super::nav::{Action, action_for};
 use super::segment::Segment;
 use super::view::{FOOTER_ROWS, content_width, draw_error};
-use super::components::tty::ProcessManager;
-use super::components::{Cached, FrameCtx, ImageStore};
 
 /// Input-poll timeout: how often an idle slide wakes to animate and blink.
 const TICK: Duration = Duration::from_millis(100);
@@ -101,7 +101,9 @@ impl App {
             .parent()
             .filter(|parent| !parent.as_os_str().is_empty())
             .map_or_else(|| PathBuf::from("."), Path::to_path_buf);
-        let last_modified = std::fs::metadata(&path).and_then(|meta| meta.modified()).ok();
+        let last_modified = std::fs::metadata(&path)
+            .and_then(|meta| meta.modified())
+            .ok();
         Self {
             deck,
             manager: ProcessManager::new(),
@@ -343,14 +345,19 @@ impl App {
 
 #[cfg(test)]
 mod tests {
-    use super::{App, Deck, parse_deck, progress_pct};
     use super::super::components::Cached;
+    use super::{App, Deck, parse_deck, progress_pct};
     use ratatui::layout::{Rect, Size};
     use ratatui_image::picker::Picker;
     use std::path::PathBuf;
 
     fn app(deck: Deck) -> App {
-        App::new(deck, Picker::halfblocks(), PathBuf::from("deck.ahr-deck"), false)
+        App::new(
+            deck,
+            Picker::halfblocks(),
+            PathBuf::from("deck.ahr-deck"),
+            false,
+        )
     }
 
     const SIZE: Size = Size {
@@ -360,7 +367,8 @@ mod tests {
 
     #[test]
     fn reload_clamps_current_to_the_new_last_slide() {
-        let mut app = app(parse_deck("# 1\n\n---\n\n# 2\n\n---\n\n# 3\n\n---\n\n# 4\n\n---\n\n# 5").unwrap());
+        let mut app =
+            app(parse_deck("# 1\n\n---\n\n# 2\n\n---\n\n# 3\n\n---\n\n# 4\n\n---\n\n# 5").unwrap());
         app.current = 4; // last of 5
         app.apply_reload("# 1\n\n---\n\n# 2\n\n---\n\n# 3", SIZE); // now 3 slides
         assert_eq!(app.deck.slides.len(), 3);
@@ -382,7 +390,10 @@ mod tests {
         let mut app = app(parse_deck("# 1\n\n---\n\n# 2").unwrap());
         app.current = 1;
         // Two `<deck>` tags is a hard parse error.
-        app.apply_reload("<deck title=\"a\" />\n\n# x\n\n---\n\n<deck title=\"b\" />\n\n# y", SIZE);
+        app.apply_reload(
+            "<deck title=\"a\" />\n\n# x\n\n---\n\n<deck title=\"b\" />\n\n# y",
+            SIZE,
+        );
         assert!(app.reload_error.is_some());
         assert_eq!(app.deck.slides.len(), 2); // unchanged
         assert_eq!(app.current, 1);

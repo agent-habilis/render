@@ -148,10 +148,22 @@ mod tests {
 
     #[test]
     fn keeps_existing_format_mapping() {
-        assert_eq!(format_for_extension(Path::new("a.mmd")), Some(Format::Mermaid));
-        assert_eq!(format_for_extension(Path::new("a.md")), Some(Format::Markdown));
-        assert_eq!(format_for_extension(Path::new("a.csv")), Some(Format::Table(b',')));
-        assert_eq!(format_for_extension(Path::new("a.ahr-deck")), Some(Format::Deck));
+        assert_eq!(
+            format_for_extension(Path::new("a.mmd")),
+            Some(Format::Mermaid)
+        );
+        assert_eq!(
+            format_for_extension(Path::new("a.md")),
+            Some(Format::Markdown)
+        );
+        assert_eq!(
+            format_for_extension(Path::new("a.csv")),
+            Some(Format::Table(b','))
+        );
+        assert_eq!(
+            format_for_extension(Path::new("a.ahr-deck")),
+            Some(Format::Deck)
+        );
         assert_eq!(format_for_extension(Path::new("a.bmp")), None);
     }
 }

@@ -103,7 +103,8 @@ impl Component for ImageComponent {
         } else {
             // Failed or not-yet-loaded: an alt/error box, wrapped so a long
             // message (e.g. a long path) is not truncated to one line.
-            let text_w = u16::try_from(console::measure_text_width(self.fallback())).unwrap_or(u16::MAX);
+            let text_w =
+                u16::try_from(console::measure_text_width(self.fallback())).unwrap_or(u16::MAX);
             let width = text_w.min(ctx.content.width).max(1);
             let height = text_w.div_ceil(width).min(ctx.content.height.max(1)).max(1);
             (width, height)
@@ -118,7 +119,10 @@ impl Component for ImageComponent {
 
     fn draw(&self, frame: &mut Frame<'_>, area: Rect, _item: &Item, ctx: &FrameCtx<'_>) {
         if !ctx.images.draw_image(ctx.current, ctx.index, frame, area) {
-            frame.render_widget(Paragraph::new(self.fallback()).wrap(Wrap { trim: false }), area);
+            frame.render_widget(
+                Paragraph::new(self.fallback()).wrap(Wrap { trim: false }),
+                area,
+            );
         }
     }
 }
@@ -253,8 +257,9 @@ mod tests {
 
     #[test]
     fn parses_src_and_attrs() {
-        let component =
-            ImageComponent::parse(" src=\"assets/logo.png\" width=\"40\" height=\"20\" alt=\"a logo\"");
+        let component = ImageComponent::parse(
+            " src=\"assets/logo.png\" width=\"40\" height=\"20\" alt=\"a logo\"",
+        );
         assert_eq!(component.src, "assets/logo.png");
         assert_eq!(component.width, Some(40));
         assert_eq!(component.height, Some(20));

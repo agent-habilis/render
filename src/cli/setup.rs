@@ -192,7 +192,11 @@ mod tests {
     #[test]
     fn agent_skills_dirs_are_under_home() {
         let home = Path::new("/home/x");
-        assert!(Agent::ClaudeCode.skills_dir(home).ends_with(".claude/skills"));
+        assert!(
+            Agent::ClaudeCode
+                .skills_dir(home)
+                .ends_with(".claude/skills")
+        );
         assert!(Agent::Pi.skills_dir(home).ends_with(".pi/agent/skills"));
         assert!(Agent::Generic.skills_dir(home).ends_with(".agent/skills"));
     }

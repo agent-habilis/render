@@ -133,9 +133,15 @@ fn parse_frames(content: &str) -> Vec<String> {
 /// trimmed, so a frame keeps its exact height — the figure stays put across the
 /// flip instead of jumping.
 fn frame_item(frame: &str) -> (Text<'static>, u16, u16) {
-    let width = frame.lines().map(console::measure_text_width).max().unwrap_or(0);
+    let width = frame
+        .lines()
+        .map(console::measure_text_width)
+        .max()
+        .unwrap_or(0);
     let height = frame.lines().count().max(1);
-    let text = frame.into_text().unwrap_or_else(|_| Text::raw(frame.to_owned()));
+    let text = frame
+        .into_text()
+        .unwrap_or_else(|_| Text::raw(frame.to_owned()));
     (
         text,
         u16::try_from(width).unwrap_or(u16::MAX),
@@ -168,14 +174,20 @@ mod tests {
 
     #[test]
     fn frame_index_advances_and_holds_or_loops() {
-        let component = AnimationComponent::parse(" seconds=\"0.2\"", "<frame>\nA\n</frame>\n<frame>\nB\n</frame>\n<frame>\nC\n</frame>");
+        let component = AnimationComponent::parse(
+            " seconds=\"0.2\"",
+            "<frame>\nA\n</frame>\n<frame>\nB\n</frame>\n<frame>\nC\n</frame>",
+        );
         assert_eq!(component.frame_index(Duration::ZERO), 0);
         assert_eq!(component.frame_index(Duration::from_millis(250)), 1);
         assert_eq!(component.frame_index(Duration::from_secs(10)), 2);
         assert!(component.is_animating(Duration::ZERO));
         assert!(!component.is_animating(Duration::from_secs(10)));
 
-        let looping = AnimationComponent::parse(" seconds=\"0.2\" loop", "<frame>\nA\n</frame>\n<frame>\nB\n</frame>");
+        let looping = AnimationComponent::parse(
+            " seconds=\"0.2\" loop",
+            "<frame>\nA\n</frame>\n<frame>\nB\n</frame>",
+        );
         assert!(looping.frame_index(Duration::from_secs(10)) < 2);
         assert!(looping.is_animating(Duration::from_secs(10)));
     }

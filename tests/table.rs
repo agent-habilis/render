@@ -10,7 +10,11 @@ fn unique_nanos() -> u128 {
 }
 
 fn temp_file(contents: &str, extension: &str) -> PathBuf {
-    let name = format!("ah-r-table-{}-{}.{extension}", std::process::id(), unique_nanos());
+    let name = format!(
+        "ah-r-table-{}-{}.{extension}",
+        std::process::id(),
+        unique_nanos()
+    );
     let path = std::env::temp_dir().join(name);
     std::fs::write(&path, contents).expect("write temp file");
     path
@@ -34,26 +38,47 @@ fn csv_renders_rounded_grid_with_header() {
 
     // Rounded outer corners.
     assert!(out.contains('╭') && out.contains('╮'), "top corners: {out}");
-    assert!(out.contains('╰') && out.contains('╯'), "bottom corners: {out}");
+    assert!(
+        out.contains('╰') && out.contains('╯'),
+        "bottom corners: {out}"
+    );
     // A solid header/row separator (├ ─ ┼ ┤), i.e. simple separators between rows.
-    assert!(out.contains('├') && out.contains('┼') && out.contains('┤'), "row rule: {out}");
+    assert!(
+        out.contains('├') && out.contains('┼') && out.contains('┤'),
+        "row rule: {out}"
+    );
     // Header and data made it through.
-    assert!(out.contains("name") && out.contains("role"), "header: {out}");
-    assert!(out.contains("Ada") && out.contains("Engineer"), "data: {out}");
+    assert!(
+        out.contains("name") && out.contains("role"),
+        "header: {out}"
+    );
+    assert!(
+        out.contains("Ada") && out.contains("Engineer"),
+        "data: {out}"
+    );
 }
 
 #[test]
 fn tsv_uses_tab_as_the_delimiter() {
     let out = render("city\tcountry\nReykjavík\tIceland\n", "tsv");
-    assert!(out.contains("city") && out.contains("country"), "header: {out}");
-    assert!(out.contains("Reykjavík") && out.contains("Iceland"), "data: {out}");
+    assert!(
+        out.contains("city") && out.contains("country"),
+        "header: {out}"
+    );
+    assert!(
+        out.contains("Reykjavík") && out.contains("Iceland"),
+        "data: {out}"
+    );
     assert!(out.contains('╭'), "rounded grid: {out}");
 }
 
 #[test]
 fn quoted_field_with_comma_stays_one_cell() {
     let out = render("name,note\nAda,\"Smith, Jr.\"\n", "csv");
-    assert!(out.contains("Smith, Jr."), "quoted comma cell preserved: {out}");
+    assert!(
+        out.contains("Smith, Jr."),
+        "quoted comma cell preserved: {out}"
+    );
     // Two columns → exactly three vertical borders per content line.
     let header_line = out
         .lines()
@@ -85,7 +110,10 @@ fn ragged_rows_pad_to_a_rectangle() {
 #[test]
 fn leading_bom_is_not_glued_to_the_first_header() {
     let out = render("\u{feff}id,value\n1,x\n", "csv");
-    let header_line = out.lines().find(|line| line.contains("id")).expect("header");
+    let header_line = out
+        .lines()
+        .find(|line| line.contains("id"))
+        .expect("header");
     // The BOM must not survive in front of `id`.
     assert!(
         !header_line.contains('\u{feff}'),

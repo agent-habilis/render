@@ -185,8 +185,8 @@ fn meta_tag(trimmed: &str) -> Option<DeckMeta> {
 
 #[cfg(test)]
 mod tests {
-    use super::{Segment, parse_deck};
     use super::super::components::AnimationComponent;
+    use super::{Segment, parse_deck};
 
     fn animation(segment: &Segment) -> &AnimationComponent {
         match segment {
@@ -206,14 +206,19 @@ mod tests {
         let deck = parse_deck("<animation>\n<frame>\n---\n</frame>\n</animation>\n\n---\n\n# Next")
             .unwrap();
         assert_eq!(deck.slides.len(), 2);
-        assert_eq!(animation(&deck.slides[0].segments()[0]).frames, vec!["---".to_owned()]);
+        assert_eq!(
+            animation(&deck.slides[0].segments()[0]).frames,
+            vec!["---".to_owned()]
+        );
         assert_eq!(deck.slides[1].body, "# Next");
     }
 
     #[test]
     fn separator_inside_a_component_is_not_a_split() {
-        let deck = parse_deck("# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>\n\n---\n\n# Next")
-            .unwrap();
+        let deck = parse_deck(
+            "# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>\n\n---\n\n# Next",
+        )
+        .unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(
             deck.slides[0].body,
@@ -247,8 +252,8 @@ mod tests {
 
     #[test]
     fn separator_inside_a_code_fence_is_not_a_split() {
-        let deck = parse_deck("# Slide\n\n```yaml\nfoo: 1\n---\nbar: 2\n```\n\n---\n\n# Next")
-            .unwrap();
+        let deck =
+            parse_deck("# Slide\n\n```yaml\nfoo: 1\n---\nbar: 2\n```\n\n---\n\n# Next").unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(
             deck.slides[0].body,
@@ -259,13 +264,17 @@ mod tests {
 
     #[test]
     fn deck_title_applies_to_all_slides_and_slide_tag_is_plain_body() {
-        let input = "<deck title=\"Deck\" />\n\n# First\n\n---\n\n<slide title=\"Second\" />\n\n# Second";
+        let input =
+            "<deck title=\"Deck\" />\n\n# First\n\n---\n\n<slide title=\"Second\" />\n\n# Second";
         let deck = parse_deck(input).unwrap();
         assert_eq!(deck.title.as_deref(), Some("Deck"));
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(deck.slides[0].body, "# First");
         // `<slide>` is no longer part of the format, so the line is ordinary body.
-        assert_eq!(deck.slides[1].body, "<slide title=\"Second\" />\n\n# Second");
+        assert_eq!(
+            deck.slides[1].body,
+            "<slide title=\"Second\" />\n\n# Second"
+        );
     }
 
     #[test]
@@ -285,7 +294,8 @@ mod tests {
 
     #[test]
     fn more_than_one_deck_tag_is_an_error() {
-        let result = parse_deck("<deck title=\"A\" />\n\n# One\n\n---\n\n<deck title=\"B\" />\n\n# Two");
+        let result =
+            parse_deck("<deck title=\"A\" />\n\n# One\n\n---\n\n<deck title=\"B\" />\n\n# Two");
         assert!(result.is_err());
     }
 

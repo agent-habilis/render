@@ -18,12 +18,15 @@ pub(super) const FOOTER_ROWS: u16 = 2;
 impl App {
     pub(super) fn draw(&self, frame: &mut Frame<'_>, segments: &[Segment], blink_on: bool) {
         let [content, footer] =
-            Layout::vertical([Constraint::Min(0), Constraint::Length(FOOTER_ROWS)]).areas(frame.area());
+            Layout::vertical([Constraint::Min(0), Constraint::Length(FOOTER_ROWS)])
+                .areas(frame.area());
 
         let laid = self.lay_out_segments(segments, content, blink_on);
         if !laid.is_empty() {
-            let constraints: Vec<Constraint> =
-                laid.iter().map(|(_, item)| Constraint::Length(item.height)).collect();
+            let constraints: Vec<Constraint> = laid
+                .iter()
+                .map(|(_, item)| Constraint::Length(item.height))
+                .collect();
             let cells = Layout::vertical(constraints)
                 .flex(Flex::Center)
                 .spacing(1)
@@ -49,7 +52,9 @@ impl App {
                 };
                 let cached = &self.static_render.items[*index];
                 let ctx = self.frame_ctx(cached, *index, content, blink_on);
-                segments[*index].as_component().draw(frame, area, item, &ctx);
+                segments[*index]
+                    .as_component()
+                    .draw(frame, area, item, &ctx);
             }
         }
 
@@ -246,9 +251,6 @@ mod tests {
 
     #[test]
     fn passes_ansi_through_untouched() {
-        assert_eq!(
-            interpolate("\x1b[1m{cur}\x1b[0m", 6, 10),
-            "\x1b[1m6\x1b[0m"
-        );
+        assert_eq!(interpolate("\x1b[1m{cur}\x1b[0m", 6, 10), "\x1b[1m6\x1b[0m");
     }
 }

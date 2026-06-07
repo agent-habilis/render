@@ -15,7 +15,11 @@ fn unique_nanos() -> u128 {
 }
 
 fn temp_deck(contents: &str, extension: &str) -> PathBuf {
-    let name = format!("ah-r-test-{}-{}.{extension}", std::process::id(), unique_nanos());
+    let name = format!(
+        "ah-r-test-{}-{}.{extension}",
+        std::process::id(),
+        unique_nanos()
+    );
     let path = std::env::temp_dir().join(name);
     std::fs::write(&path, contents).expect("write temp deck");
     path
@@ -77,7 +81,9 @@ fn deck_renders_slides_and_quits_in_a_pty() {
             if read == 0 {
                 break;
             }
-            sink.lock().expect("lock output").extend_from_slice(&chunk[..read]);
+            sink.lock()
+                .expect("lock output")
+                .extend_from_slice(&chunk[..read]);
         }
     });
 
@@ -88,7 +94,10 @@ fn deck_renders_slides_and_quits_in_a_pty() {
         .and_then(|()| writer.flush())
         .expect("send next-slide key");
     std::thread::sleep(Duration::from_millis(400));
-    writer.write_all(b"q").and_then(|()| writer.flush()).expect("send quit");
+    writer
+        .write_all(b"q")
+        .and_then(|()| writer.flush())
+        .expect("send quit");
 
     // Kill if `q` is ever ignored, so a regression cannot hang the suite.
     let mut killer = child.clone_killer();
@@ -103,11 +112,17 @@ fn deck_renders_slides_and_quits_in_a_pty() {
     let _ = watchdog.join();
     let _ = std::fs::remove_file(&path);
 
-    assert!(status.success(), "deck should exit cleanly on `q`, got {status:?}");
+    assert!(
+        status.success(),
+        "deck should exit cleanly on `q`, got {status:?}"
+    );
     let bytes = output.lock().expect("lock output");
     let text = String::from_utf8_lossy(&bytes);
     assert!(text.contains("Slide One"), "first slide text should render");
-    assert!(text.contains("1/2"), "footer should show the page indicator");
+    assert!(
+        text.contains("1/2"),
+        "footer should show the page indicator"
+    );
 }
 
 #[test]
@@ -118,7 +133,10 @@ fn deck_with_image_renders_and_quits() {
     let contents = format!("# Picture\n\n<img src=\"{img}\" />\n");
     let (ok, text) = run_deck_to_quit(&contents);
     assert!(ok, "a deck with an <img> should exit cleanly on `q`");
-    assert!(text.contains("Picture"), "the heading should render, got: {text:?}");
+    assert!(
+        text.contains("Picture"),
+        "the heading should render, got: {text:?}"
+    );
 }
 
 /// Drive a single-slide deck in a pty, send `q`, and return whether it exited
@@ -152,13 +170,18 @@ fn run_deck_to_quit(contents: &str) -> (bool, String) {
             if read == 0 {
                 break;
             }
-            sink.lock().expect("lock output").extend_from_slice(&chunk[..read]);
+            sink.lock()
+                .expect("lock output")
+                .extend_from_slice(&chunk[..read]);
         }
     });
 
     let mut writer = pair.master.take_writer().expect("take writer");
     std::thread::sleep(Duration::from_millis(700));
-    writer.write_all(b"q").and_then(|()| writer.flush()).expect("send quit");
+    writer
+        .write_all(b"q")
+        .and_then(|()| writer.flush())
+        .expect("send quit");
 
     let mut killer = child.clone_killer();
     let watchdog = std::thread::spawn(move || {
@@ -206,7 +229,9 @@ fn watched_deck_reloads_on_change() {
             if read == 0 {
                 break;
             }
-            sink.lock().expect("lock output").extend_from_slice(&chunk[..read]);
+            sink.lock()
+                .expect("lock output")
+                .extend_from_slice(&chunk[..read]);
         }
     });
 
@@ -215,7 +240,10 @@ fn watched_deck_reloads_on_change() {
     // Rewrite the watched file; the ~10 Hz poll should pick up the new mtime.
     std::fs::write(&path, "# Reloaded Heading\n").expect("rewrite deck");
     std::thread::sleep(Duration::from_millis(800));
-    writer.write_all(b"q").and_then(|()| writer.flush()).expect("send quit");
+    writer
+        .write_all(b"q")
+        .and_then(|()| writer.flush())
+        .expect("send quit");
 
     let mut killer = child.clone_killer();
     let watchdog = std::thread::spawn(move || {
@@ -229,10 +257,16 @@ fn watched_deck_reloads_on_change() {
     let _ = watchdog.join();
     let _ = std::fs::remove_file(&path);
 
-    assert!(status.success(), "watched deck should exit cleanly on `q`, got {status:?}");
+    assert!(
+        status.success(),
+        "watched deck should exit cleanly on `q`, got {status:?}"
+    );
     let bytes = output.lock().expect("lock output");
     let text = String::from_utf8_lossy(&bytes);
-    assert!(text.contains("First Heading"), "initial slide should render");
+    assert!(
+        text.contains("First Heading"),
+        "initial slide should render"
+    );
     assert!(
         text.contains("Reloaded Heading"),
         "the edited slide should appear after reload"

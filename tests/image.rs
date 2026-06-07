@@ -29,5 +29,8 @@ fn unsupported_extension_lists_images() {
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(stderr.contains("unsupported"), "got: {stderr}");
-    assert!(stderr.contains(".png"), "error should list image formats, got: {stderr}");
+    assert!(
+        stderr.contains(".png"),
+        "error should list image formats, got: {stderr}"
+    );
 }

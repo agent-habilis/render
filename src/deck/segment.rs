@@ -264,7 +264,10 @@ mod tests {
     #[test]
     fn body_without_components_is_a_single_markdown_segment() {
         let segs = split_segments("# Title\n\nsome **text**");
-        assert_eq!(segs, vec![Segment::Markdown("# Title\n\nsome **text**".into())]);
+        assert_eq!(
+            segs,
+            vec![Segment::Markdown("# Title\n\nsome **text**".into())]
+        );
     }
 
     #[test]
@@ -311,9 +314,7 @@ mod tests {
     #[test]
     fn tty_prerender_flag_is_parsed() {
         assert!(tty(&split_segments("<tty prerender>\nhtop\n</tty>")[0]).prerender);
-        assert!(
-            !tty(&split_segments("<tty prerender=\"false\">\nhtop\n</tty>")[0]).prerender
-        );
+        assert!(!tty(&split_segments("<tty prerender=\"false\">\nhtop\n</tty>")[0]).prerender);
         assert!(!tty(&split_segments("<tty>\nhtop\n</tty>")[0]).prerender);
     }
 
@@ -347,7 +348,11 @@ mod tests {
 
     #[test]
     fn plain_fences_stay_markdown() {
-        for body in ["```\nplain\n```", "```rust\nfn main() {}\n```", "```mermaid\nA-->B\n```"] {
+        for body in [
+            "```\nplain\n```",
+            "```rust\nfn main() {}\n```",
+            "```mermaid\nA-->B\n```",
+        ] {
             assert_eq!(split_segments(body), vec![Segment::Markdown(body.into())]);
         }
     }

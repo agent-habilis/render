@@ -25,7 +25,10 @@ fn run_ah_r(sh: &Shell, subcommand: &str, args: &[String]) -> TaskOutcome {
         .unwrap_or_else(|| Path::new("."))
         .join("Cargo.toml");
     output::status("Running", &format!("ah-r {subcommand} {}", args.join(" ")));
-    cmd!(sh, "cargo run --quiet --manifest-path {manifest} --bin ah-r -- {subcommand} {args...}")
-        .run()?;
+    cmd!(
+        sh,
+        "cargo run --quiet --manifest-path {manifest} --bin ah-r -- {subcommand} {args...}"
+    )
+    .run()?;
     Ok(())
 }

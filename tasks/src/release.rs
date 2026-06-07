@@ -20,7 +20,10 @@ pub(crate) fn run(sh: &Shell, args: &[String]) -> TaskOutcome {
         {
             release_args.push("--no-confirm".to_owned());
         }
-        output::status("Running", &format!("cargo release {level} {}", release_args.join(" ")));
+        output::status(
+            "Running",
+            &format!("cargo release {level} {}", release_args.join(" ")),
+        );
         cmd!(sh, "cargo release {level} {release_args...}")
             .quiet()
             .run()?;
