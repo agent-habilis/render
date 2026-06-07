@@ -30,7 +30,7 @@ const BLINK_MS: u128 = 500;
 /// Fails if the document contains no slides, or on a terminal I/O error while
 /// drawing or reading input.
 pub(crate) fn run(input: &str) -> Result<()> {
-    let deck = parse_deck(input);
+    let deck = parse_deck(input)?;
     if deck.slides.is_empty() {
         bail!("no slides found: separate slides with `---` lines");
     }
@@ -206,7 +206,8 @@ mod tests {
     fn static_render_caches_static_segments_not_processes() {
         let deck = parse_deck(
             "# H\n\n<mermaid>\nflowchart LR; A --> B\n</mermaid>\n\n<tty>\necho hi\n</tty>",
-        );
+        )
+        .unwrap();
         let segments = deck.slides[0].segments();
         let mut app = App::new(deck);
 
@@ -237,7 +238,7 @@ mod tests {
 
     #[test]
     fn code_segment_is_cached_statically() {
-        let deck = parse_deck("<code lang=\"rust\">\nfn main() {}\n</code>");
+        let deck = parse_deck("<code lang=\"rust\">\nfn main() {}\n</code>").unwrap();
         let segments = deck.slides[0].segments();
         let mut app = App::new(deck);
 
@@ -253,7 +254,8 @@ mod tests {
     fn animation_caches_frames_and_advances_on_the_clock() {
         let deck = parse_deck(
             "<animation seconds=\"0.2\">\n<frame>\nA\n</frame>\n<frame>\nB\n</frame>\n<frame>\nC\n</frame>\n</animation>",
-        );
+        )
+        .unwrap();
         let segments = deck.slides[0].segments();
         let mut app = App::new(deck);
         app.refresh_static_render(&segments, 80);

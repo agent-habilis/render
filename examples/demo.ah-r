@@ -1,7 +1,4 @@
-```deck
-title: ah-r demo
-author: agent-habilis
-```
+<deck title="ah-r demo" author="agent-habilis" />
 
 # ah-r
 
@@ -19,9 +16,7 @@ Use the **arrow keys** to move between slides, `q` to quit.
 
 ---
 
-```deck:slide
-title: Diagrams
-```
+<slide title="Diagrams" />
 
 ## Mermaid, inline
 
@@ -35,21 +30,17 @@ flowchart LR
 
 ---
 
-```deck:slide
-title: Overrides
-```
+<slide title="Overrides" />
 
 ## Per-slide titles
 
-This slide overrides the footer title via its own `deck:slide` block.
+This slide overrides the footer title via its own `<slide>` tag.
 
 Everything else falls back to the deck title.
 
 ---
 
-```deck:slide
-title: Live shell
-```
+<slide title="Live shell" />
 
 ## Real processes, live
 
@@ -61,9 +52,7 @@ This box runs a real shell command, streaming its output.
 
 ---
 
-```deck:slide
-title: It keeps running
-```
+<slide title="It keeps running" />
 
 ## The same process, one slide later
 
@@ -76,9 +65,7 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 
 ---
 
-```deck:slide
-title: Colors
-```
+<slide title="Colors" />
 
 ## Colors, like a native terminal
 

@@ -1,6 +1,4 @@
-```deck
-title: ah-r animation
-```
+<deck title="ah-r animation" />
 
 # Animation
 
@@ -9,9 +7,7 @@ every `seconds`, optionally `loop`ing.
 
 ---
 
-```deck:slide
-title: Spinner
-```
+<slide title="Spinner" />
 
 ## A looping spinner
 
@@ -34,9 +30,7 @@ title: Spinner
 
 ---
 
-```deck:slide
-title: Cat
-```
+<slide title="Cat" />
 
 ## Same width, blinks in place
 
@@ -55,9 +49,7 @@ title: Cat
 
 ---
 
-```deck:slide
-title: Countdown
-```
+<slide title="Countdown" />
 
 ## Plays once, holds the last frame
 

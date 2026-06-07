@@ -1,14 +1,17 @@
 //! Parse an `.ah-r` file into a [`Deck`] of [`Slide`]s.
 //!
 //! A deck is a Markdown file with embedded XML islands. Standalone `---` lines
-//! separate slides; ` ```deck ` / ` ```deck:slide ` fenced blocks at the start
-//! of a slide carry frontmatter (`title`). The XML components — `<code>`,
-//! `<tty>`, `<mermaid>`, `<animation>` — express what Markdown cannot; see
-//! [`Segment`].
+//! separate slides; a `<deck title="…" />` / `<slide title="…" />` self-closing
+//! tag at the start of a slide carries frontmatter. The XML components —
+//! `<code>`, `<tty>`, `<mermaid>`, `<animation>` — express what Markdown cannot;
+//! see [`Segment`].
 //!
 //! Splitting is fence- and component-aware: a `---` inside a code fence or a
 //! component is content, not a separator.
 
+use anyhow::{Result, bail};
+
+use super::components::tokenize_attrs;
 use super::segment::{
     ComponentKind, Segment, is_close_fence, open_fence_len, split_segments, xml_close, xml_open,
 };
@@ -42,36 +45,46 @@ impl Slide {
     }
 }
 
-/// Which scope a leading metadata fence configures.
+/// Which scope a leading metadata tag configures.
 #[derive(Debug, Clone, Copy)]
 enum MetaKind {
-    /// A ```` ```deck ```` block: applies to the whole deck.
+    /// A `<deck …/>` tag: applies to the whole deck.
     Deck,
-    /// A ```` ```deck:slide ```` block: applies to the current slide.
+    /// A `<slide …/>` tag: applies to the current slide.
     Slide,
 }
 
-/// Parse a deck. Infallible: a malformed or empty document simply yields the
-/// slides it can (possibly none — the caller decides that is an error).
-pub(crate) fn parse_deck(input: &str) -> Deck {
+/// Parse and validate a deck. A malformed or empty document yields the slides it
+/// can (possibly none — the caller treats that as an error).
+///
+/// # Errors
+/// More than one `<deck>` tag in the document.
+pub(crate) fn parse_deck(input: &str) -> Result<Deck> {
     let mut deck = Deck::default();
+    let mut deck_tags = 0_usize;
 
     for section in split_slides(input) {
-        let (meta_blocks, body) = strip_meta_blocks(&section);
+        let (meta_tags, body) = strip_meta_tags(&section);
 
         let mut slide_title = None;
-        for (kind, title) in meta_blocks {
-            if title.is_none() {
-                continue;
-            }
+        for (kind, title) in meta_tags {
             match kind {
-                MetaKind::Deck => deck.title = title,
-                MetaKind::Slide => slide_title = title,
+                MetaKind::Deck => {
+                    deck_tags += 1;
+                    if title.is_some() {
+                        deck.title = title;
+                    }
+                }
+                MetaKind::Slide => {
+                    if title.is_some() {
+                        slide_title = title;
+                    }
+                }
             }
         }
 
-        // A frontmatter-only section (e.g. a top-of-file `deck` block) has no
-        // body and is not a slide.
+        // A frontmatter-only section (e.g. a top-of-file `<deck/>`) has no body
+        // and is not a slide.
         let body = body.trim();
         if body.is_empty() {
             continue;
@@ -82,7 +95,10 @@ pub(crate) fn parse_deck(input: &str) -> Deck {
         });
     }
 
-    deck
+    if deck_tags > 1 {
+        bail!("a deck may declare at most one <deck> tag, but found {deck_tags}");
+    }
+    Ok(deck)
 }
 
 /// Split the document into sections on standalone `---` lines.
@@ -135,79 +151,55 @@ fn split_slides(input: &str) -> Vec<String> {
     sections
 }
 
-/// Peel leading ```` ```deck ```` / ```` ```deck:slide ```` fenced blocks off a
-/// section, returning the parsed blocks (in order) and the remaining body.
+/// Peel leading `<deck …/>` / `<slide …/>` frontmatter tags off a section,
+/// returning the parsed tags (in order) and the remaining body.
 ///
-/// Only blocks at the very start (after blank lines) are treated as metadata; a
-/// fence later in the slide is ordinary Markdown. An unterminated fence is left
-/// in the body rather than swallowing the rest of the slide.
-fn strip_meta_blocks(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
+/// Only tags at the very start (after blank lines) are treated as metadata; a
+/// `<deck/>` later in the slide is ordinary Markdown. Each tag is a single line.
+fn strip_meta_tags(section: &str) -> (Vec<(MetaKind, Option<String>)>, String) {
     let lines: Vec<&str> = section.lines().collect();
     let mut pos = 0;
-    let mut blocks = Vec::new();
+    let mut tags = Vec::new();
 
     loop {
         while pos < lines.len() && lines[pos].trim().is_empty() {
             pos += 1;
         }
-        let Some(kind) = lines.get(pos).and_then(|line| meta_fence_kind(line.trim())) else {
+        let Some(tag) = lines.get(pos).and_then(|line| meta_tag(line.trim())) else {
             break;
         };
-        let open_len = open_fence_len(lines[pos].trim()).unwrap_or(3);
-
-        let mut close = pos + 1;
-        while close < lines.len() && !is_close_fence(lines[close].trim(), open_len) {
-            close += 1;
-        }
-        if close >= lines.len() {
-            break; // unterminated fence: leave it (and the rest) as body
-        }
-
-        blocks.push((kind, parse_title(&lines[pos + 1..close])));
-        pos = close + 1;
+        tags.push(tag);
+        pos += 1;
     }
 
-    (blocks, lines[pos..].join("\n"))
+    (tags, lines[pos..].join("\n"))
 }
 
-/// Recognise a metadata opening fence: ```` ```deck ```` or
-/// ```` ```deck:slide ```` (info string matched after the back-ticks).
-fn meta_fence_kind(trimmed: &str) -> Option<MetaKind> {
-    match trimmed.strip_prefix("```")?.trim() {
-        "deck" => Some(MetaKind::Deck),
-        "deck:slide" => Some(MetaKind::Slide),
-        _ => None,
-    }
-}
-
-/// The `title` from the `key: value` lines inside a frontmatter block, if any.
-/// Other keys (and non-`key: value` lines) are ignored.
-fn parse_title(lines: &[&str]) -> Option<String> {
-    lines.iter().find_map(|line| {
-        let (key, value) = split_key_value(line)?;
-        (key == "title").then(|| value.to_owned())
-    })
-}
-
-/// Split a `key: value` line. Returns `None` unless the text before the first
-/// colon is a simple identifier (letters/digits/`_`/`-`, starting with a
-/// letter), so a stray Markdown line never looks like a field.
-fn split_key_value(line: &str) -> Option<(&str, &str)> {
-    let (raw_key, raw_value) = line.split_once(':')?;
-    let key = raw_key.trim();
-    if !is_identifier(key) {
+/// Recognise a self-closing frontmatter tag — `<deck …/>` or `<slide …/>` —
+/// returning its kind and `title` attribute (if any). The name must be followed
+/// by whitespace or the tag's end, and the tag must close with `>` (the `/` is
+/// tolerated but optional); other attributes are ignored.
+fn meta_tag(trimmed: &str) -> Option<(MetaKind, Option<String>)> {
+    let rest = trimmed.strip_prefix('<')?;
+    let (kind, after) = if let Some(after) = rest.strip_prefix("deck") {
+        (MetaKind::Deck, after)
+    } else if let Some(after) = rest.strip_prefix("slide") {
+        (MetaKind::Slide, after)
+    } else {
+        return None;
+    };
+    // The name must end here (a boundary), so `<deckx/>` is not read as `deck`.
+    if !(after.starts_with(char::is_whitespace) || after.starts_with('/') || after.starts_with('>'))
+    {
         return None;
     }
-    Some((key, raw_value.trim()))
-}
-
-fn is_identifier(text: &str) -> bool {
-    let mut chars = text.chars();
-    let Some(first) = chars.next() else {
-        return false;
-    };
-    first.is_ascii_alphabetic()
-        && chars.all(|ch| ch.is_ascii_alphanumeric() || ch == '_' || ch == '-')
+    let inner = after.trim_end().strip_suffix('>')?;
+    let attrs = inner.strip_suffix('/').unwrap_or(inner);
+    let title = tokenize_attrs(attrs)
+        .into_iter()
+        .find(|(key, _)| key == "title")
+        .and_then(|(_, value)| value);
+    Some((kind, title))
 }
 
 #[cfg(test)]
@@ -226,7 +218,8 @@ mod tests {
 
     #[test]
     fn separator_inside_a_frame_is_not_a_split() {
-        let deck = parse_deck("<animation>\n<frame>\n---\n</frame>\n</animation>\n\n---\n\n# Next");
+        let deck = parse_deck("<animation>\n<frame>\n---\n</frame>\n</animation>\n\n---\n\n# Next")
+            .unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(animation(&deck.slides[0].segments()[0]).frames, vec!["---".to_owned()]);
         assert_eq!(deck.slides[1].body, "# Next");
@@ -234,7 +227,8 @@ mod tests {
 
     #[test]
     fn separator_inside_a_component_is_not_a_split() {
-        let deck = parse_deck("# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>\n\n---\n\n# Next");
+        let deck = parse_deck("# Slide\n\n<code lang=\"yaml\">\nfoo: 1\n---\nbar: 2\n</code>\n\n---\n\n# Next")
+            .unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(
             deck.slides[0].body,
@@ -245,7 +239,7 @@ mod tests {
 
     #[test]
     fn splits_on_separators_without_frontmatter() {
-        let deck = parse_deck("# One\n\n---\n\n# Two\n\n---\n\n# Three");
+        let deck = parse_deck("# One\n\n---\n\n# Two\n\n---\n\n# Three").unwrap();
         assert!(deck.title.is_none());
         let bodies: Vec<&str> = deck
             .slides
@@ -258,7 +252,8 @@ mod tests {
     #[test]
     fn reads_deck_frontmatter_and_ignores_unknown_keys() {
         let deck =
-            parse_deck("```deck\ntitle: My Talk\nauthor: Caio\n```\n\n# Intro\n\n---\n\n# End");
+            parse_deck("<deck title=\"My Talk\" author=\"Caio\" />\n\n# Intro\n\n---\n\n# End")
+                .unwrap();
         assert_eq!(deck.title.as_deref(), Some("My Talk"));
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(deck.slides[0].body, "# Intro");
@@ -267,7 +262,8 @@ mod tests {
 
     #[test]
     fn separator_inside_a_code_fence_is_not_a_split() {
-        let deck = parse_deck("# Slide\n\n```yaml\nfoo: 1\n---\nbar: 2\n```\n\n---\n\n# Next");
+        let deck = parse_deck("# Slide\n\n```yaml\nfoo: 1\n---\nbar: 2\n```\n\n---\n\n# Next")
+            .unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(
             deck.slides[0].body,
@@ -278,8 +274,8 @@ mod tests {
 
     #[test]
     fn per_slide_title_overrides_deck_title() {
-        let input = "```deck\ntitle: Deck\n```\n\n# First\n\n---\n\n```deck:slide\ntitle: Second Page\n```\n\n# Second";
-        let deck = parse_deck(input);
+        let input = "<deck title=\"Deck\" />\n\n# First\n\n---\n\n<slide title=\"Second Page\" />\n\n# Second";
+        let deck = parse_deck(input).unwrap();
         assert_eq!(deck.slides.len(), 2);
         assert_eq!(deck.slides[0].footer_title(&deck), Some("Deck"));
         assert_eq!(deck.slides[1].footer_title(&deck), Some("Second Page"));
@@ -288,7 +284,7 @@ mod tests {
 
     #[test]
     fn deck_block_alone_is_not_a_slide() {
-        let deck = parse_deck("```deck\ntitle: T\n```\n\n---\n\n# Slide");
+        let deck = parse_deck("<deck title=\"T\" />\n\n---\n\n# Slide").unwrap();
         assert_eq!(deck.title.as_deref(), Some("T"));
         assert_eq!(deck.slides.len(), 1);
         assert_eq!(deck.slides[0].body, "# Slide");
@@ -296,26 +292,32 @@ mod tests {
     }
 
     #[test]
+    fn more_than_one_deck_tag_is_an_error() {
+        let result = parse_deck("<deck title=\"A\" />\n\n# One\n\n---\n\n<deck title=\"B\" />\n\n# Two");
+        assert!(result.is_err());
+    }
+
+    #[test]
     fn single_slide_no_separators() {
-        let deck = parse_deck("# Only\n\nsome body text");
+        let deck = parse_deck("# Only\n\nsome body text").unwrap();
         assert_eq!(deck.slides.len(), 1);
         assert_eq!(deck.slides[0].body, "# Only\n\nsome body text");
     }
 
     #[test]
     fn blank_input_has_no_slides() {
-        assert!(parse_deck("   \n\n  ").slides.is_empty());
+        assert!(parse_deck("   \n\n  ").unwrap().slides.is_empty());
     }
 
     #[test]
     fn slide_without_title_falls_back_to_none() {
-        let deck = parse_deck("# Slide");
+        let deck = parse_deck("# Slide").unwrap();
         assert_eq!(deck.slides[0].footer_title(&deck), None);
     }
 
     #[test]
     fn separator_always_splits_even_with_prose() {
-        let deck = parse_deck("# A\n\n---\n\nplain text\n\n---\n\n# B");
+        let deck = parse_deck("# A\n\n---\n\nplain text\n\n---\n\n# B").unwrap();
         let bodies: Vec<&str> = deck
             .slides
             .iter()

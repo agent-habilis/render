@@ -1,6 +1,4 @@
-```deck
-title: ah-r showcase
-```
+<deck title="ah-r showcase" />
 
 # ah-r showcase
 
@@ -11,9 +9,7 @@ Arrow keys to navigate, `q` to quit.
 
 ---
 
-```deck:slide
-title: Plain code block
-```
+<slide title="Plain code block" />
 
 ## A plain code block
 
@@ -26,9 +22,7 @@ rendering 11 slides…
 
 ---
 
-```deck:slide
-title: Live shell
-```
+<slide title="Live shell" />
 
 ## A live code block
 
@@ -40,9 +34,7 @@ while :; do date "+%H:%M:%S"; sleep 1; done
 
 ---
 
-```deck:slide
-title: Live counter
-```
+<slide title="Live counter" />
 
 ## A persistent live block
 
@@ -54,9 +46,7 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 
 ---
 
-```deck:slide
-title: Same counter, kept alive
-```
+<slide title="Same counter, kept alive" />
 
 ## The same process, one slide later
 
@@ -68,9 +58,7 @@ i=0; while :; do echo "tick $i"; i=$((i + 1)); sleep 1; done
 
 ---
 
-```deck:slide
-title: Rust
-```
+<slide title="Rust" />
 
 ## Rust, syntax highlighted
 
@@ -88,9 +76,7 @@ fn main() {
 
 ---
 
-```deck:slide
-title: HTML
-```
+<slide title="HTML" />
 
 ## HTML, syntax highlighted
 
@@ -107,9 +93,7 @@ title: HTML
 
 ---
 
-```deck:slide
-title: JavaScript
-```
+<slide title="JavaScript" />
 
 ## JavaScript, syntax highlighted
 
@@ -125,9 +109,7 @@ console.log(present(slides));
 
 ---
 
-```deck:slide
-title: Markdown source
-```
+<slide title="Markdown source" />
 
 ## Markdown, as highlighted source
 
@@ -144,9 +126,7 @@ title: Markdown source
 
 ---
 
-```deck:slide
-title: Markdown rendered
-```
+<slide title="Markdown rendered" />
 
 ## Markdown, rendered
 

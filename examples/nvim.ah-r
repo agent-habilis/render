@@ -1,6 +1,4 @@
-```deck
-title: nvim, live in a slide
-```
+<deck title="nvim, live in a slide" />
 
 # Your real editor, on a slide
 
@@ -12,9 +10,7 @@ Arrow keys to navigate, `q` to quit.
 
 ---
 
-```deck:slide
-title: Static highlight
-```
+<slide title="Static highlight" />
 
 ## The same file, highlighted statically
 
@@ -31,9 +27,7 @@ Compare it with the next slide, where the very same file is drawn by your
 
 ---
 
-```deck:slide
-title: init.lua
-```
+<slide title="init.lua" />
 
 ## `~/.config/nvim/init.lua`, rendered by nvim itself
 

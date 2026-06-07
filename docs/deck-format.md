@@ -38,30 +38,27 @@ content, not a separator. A deck must contain at least one slide.
 
 ## Frontmatter
 
-Optional metadata lives in a fenced block at the **start** of a slide (after any
-blank lines). Only the `title` key is read; everything else is ignored.
+Optional metadata is a self-closing tag at the **start** of a slide (after any
+blank lines). Only the `title` attribute is read; any others are ignored.
 
-- ` ```deck ` — deck-level. Usually the first block in the file; its `title`
-  is the default footer title for every slide. A `deck` block with no slide
-  body of its own is metadata only, not a slide.
-- ` ```deck:slide ` — per-slide. Its `title` overrides the deck title in that
-  slide's footer.
+- `<deck title="…" />` — deck-level. Place it at the top of the file; its
+  `title` is the default footer title for every slide. A `<deck>` with no slide
+  body of its own is metadata only, not a slide. **At most one `<deck>` per
+  document** — a second one is an error.
+- `<slide title="…" />` — per-slide. Overrides the deck title in that slide's
+  footer.
 
-````text
-```deck
-title: My Talk
-```
+```text
+<deck title="My Talk" />
 
 # Intro
 
 ---
 
-```deck:slide
-title: Details
-```
+<slide title="Details" />
 
 # The details
-````
+```
 
 The footer shows the active title on the left and `current/total` on the right.
 
@@ -155,10 +152,8 @@ the flip.
 
 ## A minimal deck
 
-````text
-```deck
-title: Hello
-```
+```text
+<deck title="Hello" />
 
 # Hello, deck
 
@@ -176,7 +171,7 @@ flowchart LR
 <tty title="clock" rows="4" cols="30">
 date
 </tty>
-````
+```
 
 See [`examples/`](../examples/) for complete decks: `showcase.ah-r`,
 `animation.ah-r`, `demo.ah-r`, `nvim.ah-r`.
