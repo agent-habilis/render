@@ -2,6 +2,16 @@
 //!
 //! Provides a common grid-based canvas that can be used by any plugin renderer.
 
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+
+// LOCAL PATCH (ah-r): a wide char (emoji like 🐝, CJK, ...) occupies two terminal
+// columns but the grid stores one `char` per column, so text drawn char-by-char
+// pushed everything to its right by one column and broke vertical alignment of
+// lifelines/borders. `draw_text*` now advance by display width and reserve the
+// trailing column with this sentinel; `Display` skips it so grid columns map 1:1
+// to terminal columns again. Never appears in diagram text, so it is safe.
+const WIDE_CONT: char = '\0';
+
 /// ASCII canvas representing a character grid for diagram rendering
 #[derive(Debug, Clone)]
 pub struct AsciiCanvas {
@@ -57,17 +67,21 @@ impl AsciiCanvas {
         if text.is_empty() {
             return;
         }
-        let char_count = text.chars().count();
-        self.ensure_size(x + char_count, y + 1);
-        for (i, c) in text.chars().enumerate() {
-            self.set_char(x + i, y, c);
+        self.ensure_size(x + UnicodeWidthStr::width(text), y + 1);
+        let mut col = x;
+        for c in text.chars() {
+            let w = UnicodeWidthChar::width(c).unwrap_or(0).max(1);
+            self.set_char(col, y, c);
+            for k in 1..w {
+                self.set_char(col + k, y, WIDE_CONT);
+            }
+            col += w;
         }
     }
 
     /// Draw text centered at the specified x position
     pub fn draw_text_centered(&mut self, center_x: usize, y: usize, text: &str) {
-        let char_count = text.chars().count();
-        let start_x = center_x.saturating_sub(char_count / 2);
+        let start_x = center_x.saturating_sub(UnicodeWidthStr::width(text) / 2);
         self.draw_text(start_x, y, text);
     }
 
@@ -92,7 +106,7 @@ impl std::fmt::Display for AsciiCanvas {
             .grid
             .iter()
             .map(|row| {
-                let s: String = row.iter().collect();
+                let s: String = row.iter().filter(|c| **c != WIDE_CONT).collect();
                 s.trim_end().to_string()
             })
             .collect();
