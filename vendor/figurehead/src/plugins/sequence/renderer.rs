@@ -50,7 +50,15 @@ impl SequenceRenderer {
             '-'
         };
         for x in start..=end {
-            canvas.set_char(x, y, line_char);
+            // LOCAL PATCH (ah-r): a horizontal message crossing a lifeline drew
+            // `─` over the `│`, breaking the vertical line. Draw a 4-way junction
+            // at the intersection instead so the two lines meet seamlessly.
+            let ch = match canvas.get_char(x, y) {
+                '│' | '|' if self.is_unicode() => '┼',
+                '│' | '|' => '+',
+                _ => line_char,
+            };
+            canvas.set_char(x, y, ch);
         }
     }
 
@@ -135,53 +143,76 @@ impl SequenceRenderer {
         let going_right = to_x > from_x;
         let solid = arrow.line == LineStyle::Solid;
 
-        // Determine arrow head characters
-        let (arrow_char, arrow_offset) = match arrow.head {
-            ArrowHead::Arrow => {
-                if unicode {
-                    if going_right {
-                        ('▶', 0)
-                    } else {
-                        ('◀', 0)
-                    }
-                } else if going_right {
-                    ('>', 0)
+        // Determine arrow head character
+        let has_head = arrow.head != ArrowHead::None;
+        let arrow_char = match arrow.head {
+            ArrowHead::Arrow if unicode => {
+                if going_right {
+                    '▶'
                 } else {
-                    ('<', 0)
+                    '◀'
+                }
+            }
+            ArrowHead::Arrow => {
+                if going_right {
+                    '>'
+                } else {
+                    '<'
                 }
             }
             ArrowHead::Open => {
                 if going_right {
-                    (')', 0)
+                    ')'
                 } else {
-                    ('(', 0)
+                    '('
                 }
             }
-            ArrowHead::None => {
-                (' ', 1) // No arrow, just line
-            }
+            ArrowHead::None => ' ',
         };
 
-        // Draw the line (leaving space for arrow)
-        let (line_start, line_end) = if going_right {
-            (from_x + 1, to_x.saturating_sub(1 - arrow_offset))
+        // LOCAL PATCH (ah-r): a headed arrow stops one column short of the
+        // receiver's lifeline so the `│` stays unbroken (`──▶│`). A headless line
+        // runs to the lifeline column, where draw_styled_horizontal turns the
+        // crossing into `┼`.
+        let (line_start, line_end, head_x) = if going_right {
+            if has_head {
+                (from_x + 1, to_x.saturating_sub(2), to_x.saturating_sub(1))
+            } else {
+                (from_x + 1, to_x, to_x)
+            }
+        } else if has_head {
+            (to_x + 2, from_x.saturating_sub(1), to_x + 1)
         } else {
-            (to_x + 1 + arrow_offset, from_x.saturating_sub(1))
+            (to_x, from_x.saturating_sub(1), to_x)
         };
 
         if line_start < line_end {
             self.draw_styled_horizontal(canvas, line_start, line_end, y, solid);
         }
 
-        // Draw arrow head
-        if arrow.head != ArrowHead::None {
-            canvas.set_char(to_x, y, arrow_char);
+        // LOCAL PATCH (ah-r): connect the line to the sender's lifeline with a
+        // 3-way T-junction (├ leaving right, ┤ leaving left) instead of leaving a
+        // detached `│` beside the line. Self-messages (from == to) span no line.
+        if from_x != to_x {
+            let junction = match (going_right, unicode) {
+                (true, true) => '├',
+                (false, true) => '┤',
+                (_, false) => '+',
+            };
+            canvas.set_char(from_x, y, junction);
         }
 
-        // Draw label centered on the line
+        // Draw arrow head (one column short of the receiver, see above).
+        if has_head {
+            canvas.set_char(head_x, y, arrow_char);
+        }
+
+        // LOCAL PATCH (ah-r): pad the label with a space each side so the text
+        // doesn't abut the arrow line (`──── label ────` instead of
+        // `────label────`).
         if !label.is_empty() {
             let center_x = (from_x + to_x) / 2;
-            canvas.draw_text_centered(center_x, y, label);
+            canvas.draw_text_centered(center_x, y, &format!(" {label} "));
         }
     }
 

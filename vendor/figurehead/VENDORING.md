@@ -26,6 +26,14 @@ advance by display width (`unicode-width`) and reserve the trailing column with 
 mapping. Layout/box sizing already used display width, so only the canvas needed
 aligning.
 
+`src/plugins/sequence/renderer.rs` — message arrows drew `─` straight over the
+lifelines they touched (and dropped the arrowhead onto the receiver's `│`), so
+every lifeline a message started at, crossed, or ended on was broken. The patch
+keeps the lifelines intact with box-drawing junctions: `├`/`┤` where a message
+leaves its sender, `┼` where it crosses an intermediate lifeline, and the
+arrowhead now stops one column short of the receiver so its `│` survives
+(`──▶│`). ASCII mode uses `+`.
+
 ## Re-syncing on upgrade
 
 `Cargo.toml` here is slimmed to the library target and its runtime deps
