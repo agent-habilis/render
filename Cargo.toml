@@ -1,5 +1,8 @@
 [workspace]
 members = ["tasks"]
+# Vendored dependency (see [patch.crates-io]); built as a dep, not a member, so
+# our workspace lints and `--workspace` builds/tests skip the third-party code.
+exclude = ["vendor/figurehead"]
 
 # Shared package fields. The crate opts in with `edition.workspace = true`
 # / `rust-version.workspace = true` so the workspace stays in lockstep on
@@ -99,3 +102,8 @@ push = false
 tag-name = "v{{version}}"
 pre-release-commit-message = "chore: release v{{version}}"
 allow-branch = ["main"]
+
+# Local fork of figurehead 0.4.3 with a self-message layout fix upstream hasn't
+# shipped (panics on `sequenceDiagram` self-messages). See vendor/figurehead/VENDORING.md.
+[patch.crates-io]
+figurehead = { path = "vendor/figurehead" }

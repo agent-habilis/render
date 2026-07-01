@@ -1,0 +1,46 @@
+# Vendored copy of figurehead 0.4.3 (https://github.com/Mootikins/figurehead-rs),
+# carried only to apply the self-message layout fix in
+# src/plugins/sequence/layout.rs. See VENDORING.md. Manifest slimmed to the
+# library target and its runtime dependencies (upstream test/example targets
+# and dev-dependencies dropped — we build only the lib via [patch.crates-io]).
+
+[package]
+name = "figurehead"
+version = "0.4.3"
+edition = "2021"
+authors = ["Matthew Krohn <matthew.d.krohn@gmail.com>"]
+description = "A Rust library to convert Mermaid.js diagram markup into ASCII diagrams"
+homepage = "https://github.com/Mootikins/figurehead-rs"
+repository = "https://github.com/Mootikins/figurehead-rs"
+readme = "README.md"
+license = "MIT"
+build = false
+autolib = false
+autobins = false
+autoexamples = false
+autotests = false
+autobenches = false
+
+[features]
+class = []
+default = ["flowchart"]
+flowchart = []
+sequence = []
+
+[lib]
+name = "figurehead"
+path = "src/lib.rs"
+
+[dependencies]
+anyhow = "1.0"
+chumsky = "0.11.2"
+thiserror = "1.0"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "fmt", "ansi", "json"] }
+unicode-width = "0.1"
+
+[target.'cfg(target_arch = "wasm32")'.dependencies]
+console_error_panic_hook = "0.1"
+serde_json = "1.0"
+tracing-wasm = "0.1"
+wasm-bindgen = "0.2"

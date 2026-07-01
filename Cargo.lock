@@ -829,8 +829,6 @@ dependencies = [
 [[package]]
 name = "figurehead"
 version = "0.4.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8ec2410d35b21aac89718107336d210bafc29aa83f03088463ecde62312557ff"
 dependencies = [
  "anyhow",
  "chumsky",
