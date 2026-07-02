@@ -6,7 +6,7 @@ use std::time::Duration;
 
 use portable_pty::{CommandBuilder, PtySize, native_pty_system};
 
-const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
+const AHRE: &str = env!("CARGO_BIN_EXE_ahre");
 
 fn unique_nanos() -> u128 {
     std::time::SystemTime::now()
@@ -16,7 +16,7 @@ fn unique_nanos() -> u128 {
 
 fn temp_deck(contents: &str, extension: &str) -> PathBuf {
     let name = format!(
-        "ah-r-test-{}-{}.{extension}",
+        "ahre-test-{}-{}.{extension}",
         std::process::id(),
         unique_nanos()
     );
@@ -28,7 +28,7 @@ fn temp_deck(contents: &str, extension: &str) -> PathBuf {
 #[test]
 fn deck_outside_a_terminal_is_rejected() {
     let path = temp_deck("# One\n\n---\n\n# Two\n", "ahr-deck");
-    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
+    let output = Command::new(AHRE).arg(&path).output().expect("run ahre");
     let _ = std::fs::remove_file(&path);
 
     assert!(!output.status.success(), "a piped deck (no tty) must fail");
@@ -42,7 +42,7 @@ fn deck_outside_a_terminal_is_rejected() {
 #[test]
 fn unsupported_extension_is_rejected() {
     let path = temp_deck("# not a deck\n", "txt");
-    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
+    let output = Command::new(AHRE).arg(&path).output().expect("run ahre");
     let _ = std::fs::remove_file(&path);
 
     assert!(!output.status.success());
@@ -63,13 +63,13 @@ fn deck_renders_slides_and_quits_in_a_pty() {
         })
         .expect("open pty");
 
-    let mut cmd = CommandBuilder::new(AH_R);
+    let mut cmd = CommandBuilder::new(AHRE);
     cmd.arg(&path);
     cmd.env("TERM", "xterm-256color");
     // Skip the graphics-protocol query, which would otherwise read stdin and
     // swallow the keystrokes this test sends.
     cmd.env("AH_R_NO_IMAGE_QUERY", "1");
-    let mut child = pair.slave.spawn_command(cmd).expect("spawn ah-r");
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn ahre");
     drop(pair.slave);
 
     let output = Arc::new(Mutex::new(Vec::new()));
@@ -106,7 +106,7 @@ fn deck_renders_slides_and_quits_in_a_pty() {
         let _ = killer.kill();
     });
 
-    let status = child.wait().expect("wait for ah-r");
+    let status = child.wait().expect("wait for ahre");
     drop(pair.master);
     reader_thread.join().expect("join reader");
     let _ = watchdog.join();
@@ -154,11 +154,11 @@ fn run_deck_to_quit(contents: &str) -> (bool, String) {
         })
         .expect("open pty");
 
-    let mut cmd = CommandBuilder::new(AH_R);
+    let mut cmd = CommandBuilder::new(AHRE);
     cmd.arg(&path);
     cmd.env("TERM", "xterm-256color");
     cmd.env("AH_R_NO_IMAGE_QUERY", "1");
-    let mut child = pair.slave.spawn_command(cmd).expect("spawn ah-r");
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn ahre");
     drop(pair.slave);
 
     let output = Arc::new(Mutex::new(Vec::new()));
@@ -189,7 +189,7 @@ fn run_deck_to_quit(contents: &str) -> (bool, String) {
         let _ = killer.kill();
     });
 
-    let status = child.wait().expect("wait for ah-r");
+    let status = child.wait().expect("wait for ahre");
     drop(pair.master);
     reader_thread.join().expect("join reader");
     let _ = watchdog.join();
@@ -212,12 +212,12 @@ fn watched_deck_reloads_on_change() {
         })
         .expect("open pty");
 
-    let mut cmd = CommandBuilder::new(AH_R);
+    let mut cmd = CommandBuilder::new(AHRE);
     cmd.arg(&path);
     cmd.arg("--watch");
     cmd.env("TERM", "xterm-256color");
     cmd.env("AH_R_NO_IMAGE_QUERY", "1");
-    let mut child = pair.slave.spawn_command(cmd).expect("spawn ah-r");
+    let mut child = pair.slave.spawn_command(cmd).expect("spawn ahre");
     drop(pair.slave);
 
     let output = Arc::new(Mutex::new(Vec::new()));
@@ -251,7 +251,7 @@ fn watched_deck_reloads_on_change() {
         let _ = killer.kill();
     });
 
-    let status = child.wait().expect("wait for ah-r");
+    let status = child.wait().expect("wait for ahre");
     drop(pair.master);
     reader_thread.join().expect("join reader");
     let _ = watchdog.join();

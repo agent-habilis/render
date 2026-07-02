@@ -31,6 +31,6 @@ pub(crate) fn run(sh: &Shell, args: &[String]) -> TaskOutcome {
     }
     output::status("Building", "release binary");
     cmd!(sh, "cargo build --release").quiet().run()?;
-    output::status("Built", "target/release/ah-r");
+    output::status("Built", "target/release/ahre");
     Ok(())
 }

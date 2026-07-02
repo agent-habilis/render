@@ -4,7 +4,7 @@ Guidance for AI agents working in this repository.
 
 ## Architecture
 
-`ah-r` renders an input file as terminal text, picking a renderer from the file
+`ahre` renders an input file as terminal text, picking a renderer from the file
 extension. The layout follows from that:
 
 - **One module folder per rendered type.** Each supported type lives in its own

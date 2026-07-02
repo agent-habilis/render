@@ -1,6 +1,6 @@
 use std::process::Command;
 
-const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
+const AHRE: &str = env!("CARGO_BIN_EXE_ahre");
 
 // Only the not-a-terminal guard is exercised: the successful inline render
 // anchors its viewport with a cursor-position query a captured pipe never
@@ -9,7 +9,7 @@ const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
 fn image_outside_a_terminal_is_rejected() {
     let img = concat!(env!("CARGO_MANIFEST_DIR"), "/examples/sample.png");
     // `output()` captures stdout/stderr through pipes, so neither is a TTY.
-    let output = Command::new(AH_R).arg(img).output().expect("run ah-r");
+    let output = Command::new(AHRE).arg(img).output().expect("run ahre");
 
     assert!(!output.status.success(), "a piped image (no tty) must fail");
     let stderr = String::from_utf8_lossy(&output.stderr);
@@ -21,10 +21,10 @@ fn image_outside_a_terminal_is_rejected() {
 
 #[test]
 fn unsupported_extension_lists_images() {
-    let output = Command::new(AH_R)
+    let output = Command::new(AHRE)
         .arg("nope.bmp")
         .output()
-        .expect("run ah-r");
+        .expect("run ahre");
 
     assert!(!output.status.success());
     let stderr = String::from_utf8_lossy(&output.stderr);

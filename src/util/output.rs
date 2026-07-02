@@ -1,7 +1,7 @@
 use console::style;
 
 // `console` strips color when stderr isn't a terminal, so piped/captured
-// output (an agent running `ah-r …`) stays clean.
+// output (an agent running `ahre …`) stays clean.
 pub(crate) fn status(verb: &str, msg: &str) {
     eprintln!("{} {msg}", style(format!("{verb:>12}")).green().bold());
 }

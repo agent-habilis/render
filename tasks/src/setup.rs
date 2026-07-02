@@ -16,7 +16,7 @@ pub(crate) fn teardown(sh: &Shell, args: &[String]) -> TaskOutcome {
     run_ah_r(sh, "teardown", args)
 }
 
-/// Run `ah-r <subcommand> <args...>` via `cargo run`, anchored at the root crate
+/// Run `ahre <subcommand> <args...>` via `cargo run`, anchored at the root crate
 /// (parent of this `tasks/` crate, resolved at compile time) so it works from
 /// any cwd — not whatever package happens to be in the caller's directory.
 fn run_ah_r(sh: &Shell, subcommand: &str, args: &[String]) -> TaskOutcome {
@@ -24,10 +24,10 @@ fn run_ah_r(sh: &Shell, subcommand: &str, args: &[String]) -> TaskOutcome {
         .parent()
         .unwrap_or_else(|| Path::new("."))
         .join("Cargo.toml");
-    output::status("Running", &format!("ah-r {subcommand} {}", args.join(" ")));
+    output::status("Running", &format!("ahre {subcommand} {}", args.join(" ")));
     cmd!(
         sh,
-        "cargo run --quiet --manifest-path {manifest} --bin ah-r -- {subcommand} {args...}"
+        "cargo run --quiet --manifest-path {manifest} --bin ahre -- {subcommand} {args...}"
     )
     .run()?;
     Ok(())

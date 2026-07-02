@@ -1,6 +1,6 @@
 # H1 — Render Markdown in the Terminal
 
-`ah-r` reads a Markdown file and prints a **styled** terminal view using
+`ahre` reads a Markdown file and prints a **styled** terminal view using
 [termimad](https://crates.io/crates/termimad), themed with the Tokyo Night Moon
 palette.
 

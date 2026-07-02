@@ -1,4 +1,4 @@
-<deck title="ah-r animation" />
+<deck title="ahre animation" />
 
 # Animation
 
@@ -68,4 +68,4 @@ No `loop` — it counts down once and stays on `go!`.
 
 # Thanks
 
-Made with `ah-r` by agent-habilis.
+Made with `ahre` by agent-habilis.

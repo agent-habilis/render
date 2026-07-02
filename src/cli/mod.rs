@@ -122,7 +122,7 @@ fn render_file(path: &Path, watch: bool) -> Result<()> {
 
     match write {
         Ok(()) => Ok(()),
-        // A reader closing the pipe early (`ah-r … | head`) is a clean end for a
+        // A reader closing the pipe early (`ahre … | head`) is a clean end for a
         // filter; Rust ignores SIGPIPE, so EPIPE surfaces here instead.
         Err(err) if err.kind() == std::io::ErrorKind::BrokenPipe => Ok(()),
         Err(err) => Err(anyhow::anyhow!("failed to write stdout: {err}")),

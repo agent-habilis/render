@@ -63,7 +63,7 @@ name = "agent_habilis_render"
 path = "src/lib.rs"
 
 [[bin]]
-name = "ah-r"
+name = "ahre"
 path = "src/main.rs"
 
 [dependencies]

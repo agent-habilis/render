@@ -10,7 +10,7 @@ use ratatui_image::protocol::StatefulProtocol;
 use ratatui_image::{Resize, StatefulImage};
 
 /// Render an image inline at the cursor and return, leaving it in the scrollback
-/// (like `ah-r notes.md` prints and returns). The caller guarantees an
+/// (like `ahre notes.md` prints and returns). The caller guarantees an
 /// interactive TTY — the inline viewport's cursor-position query needs one.
 pub(crate) fn render(path: &Path) -> Result<()> {
     // Build the picker before the inline terminal: its font size sets the

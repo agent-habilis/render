@@ -186,7 +186,7 @@ mod tests {
     fn embedded_skill_has_render_frontmatter() {
         assert!(SKILL.starts_with("---"));
         assert!(SKILL.contains("name: render"));
-        assert!(SKILL.contains("allowed-tools: Bash(ah-r:*)"));
+        assert!(SKILL.contains("allowed-tools: Bash(ahre:*)"));
     }
 
     #[test]

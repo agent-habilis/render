@@ -1,16 +1,16 @@
 # The `.ahr-deck` deck format
 
-An `.ahr-deck` deck is a **Markdown file with embedded XML islands**. `ah-r` renders
+An `.ahr-deck` deck is a **Markdown file with embedded XML islands**. `ahre` renders
 it as a full-screen terminal presentation: each slide is a vertically-centered
 stack of Markdown prose and embedded components (code, diagrams, live shells,
 animations).
 
 ```sh
-ah-r slides.ahr-deck
+ahre slides.ahr-deck
 ```
 
 A deck takes over the terminal, so it needs an **interactive TTY** on both
-stdin and stdout — in a pipe or redirect `ah-r` errors instead of rendering.
+stdin and stdout — in a pipe or redirect `ahre` errors instead of rendering.
 Navigate with the arrow keys; press `q` to quit.
 
 | Action | Keys |
@@ -22,7 +22,7 @@ Navigate with the arrow keys; press `q` to quit.
 
 ## Live reload (`--watch`)
 
-`ah-r slides.ahr-deck --watch` watches the file and re-renders on every save, so you
+`ahre slides.ahr-deck --watch` watches the file and re-renders on every save, so you
 can edit and preview in a tight loop. It keeps your place (the current page) and
 leaves any running `<tty>` processes alive across the reload. If the page you're
 on no longer exists — e.g. you deleted the last few slides — it drops to the new
@@ -58,7 +58,7 @@ Optional metadata is a self-closing `<deck>` tag at the **start** of a slide
   `{total}` expand to the current page (1-based) and the slide count; `{{`/`}}`
   are literal braces. Omit it for the default `current/total`.
 - `progress="false"` — turn off the terminal progress indicator. While a deck is
-  open `ah-r` reports the current slide of the total via the **OSC 9;4** escape,
+  open `ahre` reports the current slide of the total via the **OSC 9;4** escape,
   so terminals that support it (Ghostty, WezTerm, kitty, Windows Terminal,
   ConEmu) show a progress bar in the tab/taskbar; it's cleared on quit. On by
   default — `progress="false"` (or the bare `progress` flag to force it on).
@@ -208,7 +208,7 @@ Some **Markdown**, then a diagram:
 
 <mermaid>
 flowchart LR
-  idea --> render[ah-r] --> terminal
+  idea --> render[ahre] --> terminal
 </mermaid>
 
 ---

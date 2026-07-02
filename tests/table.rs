@@ -1,7 +1,7 @@
 use std::path::PathBuf;
 use std::process::Command;
 
-const AH_R: &str = env!("CARGO_BIN_EXE_ah-r");
+const AHRE: &str = env!("CARGO_BIN_EXE_ahre");
 
 fn unique_nanos() -> u128 {
     std::time::SystemTime::now()
@@ -11,7 +11,7 @@ fn unique_nanos() -> u128 {
 
 fn temp_file(contents: &str, extension: &str) -> PathBuf {
     let name = format!(
-        "ah-r-table-{}-{}.{extension}",
+        "ahre-table-{}-{}.{extension}",
         std::process::id(),
         unique_nanos()
     );
@@ -22,11 +22,11 @@ fn temp_file(contents: &str, extension: &str) -> PathBuf {
 
 fn render(contents: &str, extension: &str) -> String {
     let path = temp_file(contents, extension);
-    let output = Command::new(AH_R).arg(&path).output().expect("run ah-r");
+    let output = Command::new(AHRE).arg(&path).output().expect("run ahre");
     let _ = std::fs::remove_file(&path);
     assert!(
         output.status.success(),
-        "ah-r failed: {}",
+        "ahre failed: {}",
         String::from_utf8_lossy(&output.stderr)
     );
     String::from_utf8(output.stdout).expect("utf8 stdout")

@@ -1,6 +1,6 @@
-<deck title="ah-r showcase" />
+<deck title="ahre showcase" />
 
-# ah-r showcase
+# ahre showcase
 
 Code blocks, **live** shells, and real syntax highlighting — all in the
 terminal.
@@ -14,7 +14,7 @@ Arrow keys to navigate, `q` to quit.
 An untagged fence renders as a styled (non-highlighted) block:
 
 ```
-$ ah-r showcase.ahr-deck
+$ ahre showcase.ahr-deck
 rendering 11 slides…
 ```
 
@@ -72,7 +72,7 @@ fn main() {
 <!doctype html>
 <html lang="en">
   <body>
-    <h1 class="title">ah-r</h1>
+    <h1 class="title">ahre</h1>
     <!-- a comment -->
     <p>Slides in your <strong>terminal</strong>.</p>
   </body>
@@ -125,4 +125,4 @@ console.log(present(slides));
 
 # Thanks
 
-Made with `ah-r` by agent-habilis.
+Made with `ahre` by agent-habilis.

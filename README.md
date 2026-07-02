@@ -1,4 +1,4 @@
-# render (`ah-r`)
+# render (`ahre`)
 
 A small Rust binary in the agent-habilis family. It **renders a file as
 terminal text**, choosing the renderer from the file's extension:
@@ -26,15 +26,15 @@ terminal text**, choosing the renderer from the file's extension:
 ## Usage
 
 ```sh
-ah-r diagram.mmd
-ah-r notes.md
+ahre diagram.mmd
+ahre notes.md
 ```
 
 The extension picks the renderer; an unsupported extension is an error. Output
 is written to stdout, so it pipes cleanly:
 
 ```sh
-ah-r notes.md | less -R
+ahre notes.md | less -R
 ```
 
 ### Examples
@@ -42,10 +42,10 @@ ah-r notes.md | less -R
 Sample inputs live in [`examples/`](examples/):
 
 ```sh
-ah-r examples/flowchart-td.mmd
-ah-r examples/sequence.mmd
-ah-r examples/table.csv
-ah-r examples/sample.png
+ahre examples/flowchart-td.mmd
+ahre examples/sequence.mmd
+ahre examples/table.csv
+ahre examples/sample.png
 ```
 
 ## Build
@@ -54,7 +54,7 @@ ah-r examples/sample.png
 cargo build --release
 ```
 
-The binary is named `ah-r`.
+The binary is named `ahre`.
 
 ## License
 

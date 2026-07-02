@@ -6,7 +6,7 @@ use super::setup::Agent;
 
 #[derive(Parser, Debug)]
 #[command(
-    name = "ah-r",
+    name = "ahre",
     about = "render diagrams and documents as terminal text",
     version,
     arg_required_else_help = true,

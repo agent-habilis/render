@@ -1,6 +1,6 @@
-<deck title="ah-r demo" author="agent-habilis" />
+<deck title="ahre demo" author="agent-habilis" />
 
-# ah-r
+# ahre
 
 A PowerPoint-style deck, in your terminal.
 
@@ -20,7 +20,7 @@ Use the **arrow keys** to move between slides, `q` to quit.
 
 <mermaid>
 flowchart LR
-    A[Write .ahr-deck] --> B[ah-r deck.ahr-deck]
+    A[Write .ahr-deck] --> B[ahre deck.ahr-deck]
     B --> C{Present}
     C --> D[Arrow keys]
     C --> E[q to quit]
@@ -72,4 +72,4 @@ No `id`, so this one is killed when you leave — and restarts if you return.
 
 # Thanks
 
-Made with `ah-r` by agent-habilis.
+Made with `ahre` by agent-habilis.
