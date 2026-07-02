@@ -90,7 +90,7 @@ fn render_file(path: &Path, watch: bool) -> Result<()> {
     // Explicit arms (no `_ =>`) so a new variant is a compile error.
     let rendered = match format {
         Format::Mermaid => mermaid::mermaid(&input)?,
-        Format::Markdown => markdown::markdown(&input),
+        Format::Markdown => markdown::markdown(&input, path.parent()),
         Format::Table(delimiter) => table::table(&input, delimiter),
         // A presentation takes over the terminal and returns from here. It needs
         // an interactive TTY on both ends: stdout to draw, stdin so key events

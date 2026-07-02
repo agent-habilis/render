@@ -1,10 +1,12 @@
 use std::io::IsTerminal;
 use std::ops::Range;
+use std::path::Path;
 
 use termimad::crossterm::style::{Attribute, Color};
 use termimad::{Alignment, CompoundStyle, LineStyle, MadSkin, StyledChar, rgb};
 
 mod highlight;
+mod link;
 
 pub(crate) use highlight::render_code;
 
@@ -21,23 +23,24 @@ const ORANGE: Color = rgb(0xff, 0x96, 0x6c);
 const INLINE_BG: Color = rgb(0x2f, 0x33, 0x4d);
 const BLOCK_BG: Color = rgb(0x1e, 0x20, 0x30);
 
-/// Full render with fenced blocks spliced in (see [`markdown_to_width`]).
-pub(crate) fn markdown(input: &str) -> String {
-    markdown_to_width(input, wrap_width())
+/// Full render with fenced blocks spliced in (see [`markdown_to_width`]). `base`
+/// is the source file's directory, used to resolve relative link targets.
+pub(crate) fn markdown(input: &str, base: Option<&Path>) -> String {
+    markdown_to_width(input, wrap_width(), base)
 }
 
 /// Plain termimad, no fence splicing — for deck prose (decks use `<mermaid>`/`<code>`).
 pub(crate) fn markdown_plain(input: &str, width: usize) -> String {
-    termimad(input, width)
+    termimad(input, width, None)
 }
 
 /// Splices each fenced block in where its source sat: a `mermaid` block as a
 /// drawn diagram (falling back to a code box when it can't be drawn), every other
 /// fence as a code box via [`render_code`]. Prose between blocks goes to termimad.
-fn markdown_to_width(input: &str, width: usize) -> String {
+fn markdown_to_width(input: &str, width: usize, base: Option<&Path>) -> String {
     let blocks = fenced_blocks(input);
     if blocks.is_empty() {
-        return termimad(input, width);
+        return termimad(input, width, base);
     }
 
     let mut out = String::new();
@@ -48,7 +51,7 @@ fn markdown_to_width(input: &str, width: usize) -> String {
         // Each prose slice renders on its own — a fence is always a block boundary.
         let before = trim_blank_lines(&input[cursor..start]);
         if !before.is_empty() {
-            out.push_str(&termimad(before, width));
+            out.push_str(&termimad(before, width, base));
         }
 
         ensure_blank_line(&mut out);
@@ -66,7 +69,7 @@ fn markdown_to_width(input: &str, width: usize) -> String {
 
     let after = trim_blank_lines(&input[cursor..]);
     if !after.is_empty() {
-        out.push_str(&termimad(after, width));
+        out.push_str(&termimad(after, width, base));
     }
 
     // Drop the trailing "\n\n" so a doc ending in a fence gains no extra blank line.
@@ -100,8 +103,10 @@ fn trim_blank_lines(text: &str) -> &str {
     }
 }
 
-fn termimad(input: &str, width: usize) -> String {
-    skin().text(input, Some(width)).to_string()
+fn termimad(input: &str, width: usize, base: Option<&Path>) -> String {
+    let (marked, urls) = link::extract(input, base);
+    let rendered = skin().text(&marked, Some(width)).to_string();
+    link::apply(&rendered, &urls)
 }
 
 /// termimad's default underlines every heading and renders `h2`–`h6` alike; this
@@ -217,7 +222,7 @@ mod tests {
 
     #[test]
     fn language_tagged_fence_is_syntax_highlighted() {
-        let out = markdown("```rust\nfn main() {}\n```\n");
+        let out = markdown("```rust\nfn main() {}\n```\n", None);
         assert!(
             out.contains("\u{1b}[38;2;"),
             "expected 24-bit color escapes"
@@ -227,7 +232,7 @@ mod tests {
 
     #[test]
     fn untagged_fence_renders_a_generic_box() {
-        let out = markdown("```\nplain text\n```\n");
+        let out = markdown("```\nplain text\n```\n", None);
         assert!(out.contains("plain text"));
         assert!(
             out.contains("48;2;47;51;77"),
