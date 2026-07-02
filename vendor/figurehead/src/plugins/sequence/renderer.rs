@@ -239,7 +239,12 @@ impl SequenceRenderer {
         }
 
         // Draw lifelines
+        // LOCAL PATCH (ah-r): attach each lifeline to the bottom of its box with
+        // a `┬`, so the vertical line connects to the participant instead of
+        // hanging one row below a flat `└────┘` border.
+        let down_tee = if self.is_unicode() { '┬' } else { '+' };
         for participant in &layout.participants {
+            canvas.set_char(participant.x, layout.lifeline_start_y, down_tee);
             self.draw_lifeline(
                 &mut canvas,
                 participant.x,
