@@ -2,7 +2,9 @@ use std::panic::{self, AssertUnwindSafe};
 
 use anyhow::{Context, Result, anyhow};
 
-pub(crate) fn mermaid(input: &str) -> Result<String> {
+/// # Errors
+/// The diagram does not parse, or the renderer panics on it.
+pub fn mermaid(input: &str) -> Result<String> {
     // figurehead panics rather than erroring on some inputs, so one bad diagram
     // would abort the whole render. Contain it — hook silenced so the backtrace
     // doesn't reach the terminal — letting callers fall back to the raw source.
