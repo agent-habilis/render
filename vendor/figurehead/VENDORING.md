@@ -34,6 +34,28 @@ leaves its sender, `┼` where it crosses an intermediate lifeline, and the
 arrowhead now stops one column short of the receiver so its `│` survives
 (`──▶│`). ASCII mode uses `+`.
 
+`src/plugins/flowchart/layout.rs`, `src/plugins/flowchart/renderer.rs` — flowchart
+edges:
+
+- A **back edge between two members of one subgraph** was routed 2 cells past
+  the whole diagram, while the subgraph frame was sized from its members only,
+  so the edge left the frame and crossed it twice. The edge now routes 1 cell
+  past the members, and that frame grows to hold the route. In LR/RL the
+  canvas margin for back edges was added to the width instead of the height,
+  so the route below the diagram fell off the canvas; it now goes to the
+  height.
+- A **TD/BT branch label** was drawn on the branch line, directly behind the
+  arrowhead, so the arrowhead touched no line cell. The label now goes beside
+  the line, on the side away from the junction, and stays on the left only
+  when it fits above its own target box. `rank_sep` goes from 4 to 5, so a
+  branch after a split junction is a corner, a line cell with the label beside
+  it, a line cell, and the arrowhead. A single offset edge turns at the same
+  row.
+- **BT/RL arrowheads and back-edge arrowheads** stopped one cell short of the
+  target box, because they entered one cell past its border (TD/LR enter at the
+  border). They now enter at the border. The BT/RL split junction also sat
+  against the source box; it now leaves one line cell, as TD/LR do.
+
 ## Re-syncing on upgrade
 
 `Cargo.toml` here is slimmed to the library target and its runtime deps

@@ -74,7 +74,9 @@ impl Default for LayoutConfig {
     fn default() -> Self {
         Self {
             node_sep: 1, // was 4: horizontal gap between nodes in same layer
-            rank_sep: 4, // gap between layers (need 4 for visible edge lines in LR splits)
+            // LOCAL PATCH (ah-r): was 4. A split branch needs a corner, a line cell
+            // beside its label, a line cell, and the arrowhead after the junction.
+            rank_sep: 5,
             min_node_width: 5,
             min_node_height: 3,
             padding: 1,          // was 2: canvas edge padding
@@ -445,16 +447,37 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                     .count();
 
                 if forward_edge_count > 1 {
+                    // LOCAL PATCH (ah-r): BT/RL measured from one cell past the
+                    // box, not from its border as TD/LR do (see the forward entry
+                    // points below).
                     let merge_point = match direction {
                         Direction::TopDown => (to.x + to.width / 2, to.y.saturating_sub(2)),
-                        Direction::BottomUp => (to.x + to.width / 2, to.y + to.height + 2),
+                        Direction::BottomUp => (to.x + to.width / 2, to.y + to.height + 1),
                         Direction::LeftRight => (to.x.saturating_sub(2), to.y + to.height / 2),
-                        Direction::RightLeft => (to.x + to.width + 2, to.y + to.height / 2),
+                        Direction::RightLeft => (to.x + to.width + 1, to.y + to.height / 2),
                     };
                     merge_junctions.insert(*target_id, merge_point);
                 }
             }
         }
+
+        // LOCAL PATCH (ah-r): a back edge between two members of one subgraph was
+        // routed past the whole diagram, so it left the subgraph frame and crossed
+        // it twice. Route it just past the members instead, and grow that frame
+        // to hold the route (see `routed_inside` below).
+        let mut member_bounds: HashMap<&str, (usize, usize, usize, usize)> = HashMap::new();
+        for subgraph in database.subgraphs() {
+            for member in subgraph.members.iter().filter_map(|m| node_positions.get(m.as_str())) {
+                let bounds = member_bounds
+                    .entry(subgraph.id.as_str())
+                    .or_insert((usize::MAX, usize::MAX, 0, 0));
+                bounds.0 = bounds.0.min(member.x);
+                bounds.1 = bounds.1.min(member.y);
+                bounds.2 = bounds.2.max(member.x + member.width);
+                bounds.3 = bounds.3.max(member.y + member.height);
+            }
+        }
+        let mut routed_inside: std::collections::HashSet<&str> = std::collections::HashSet::new();
 
         for (source_id, edges) in edges_by_source {
             let Some(from) = node_positions.get(source_id) else {
@@ -468,14 +491,16 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
             let junction = if is_split {
                 match direction {
                     Direction::TopDown => Some((from.x + from.width / 2, from.y + from.height + 1)),
+                    // LOCAL PATCH (ah-r): BT and RL put the junction against the
+                    // source box. Leave one line cell between them, as TD and LR do.
                     Direction::BottomUp => {
-                        Some((from.x + from.width / 2, from.y.saturating_sub(1)))
+                        Some((from.x + from.width / 2, from.y.saturating_sub(2)))
                     }
                     Direction::LeftRight => {
                         Some((from.x + from.width + 1, from.y + from.height / 2))
                     }
                     Direction::RightLeft => {
-                        Some((from.x.saturating_sub(1), from.y + from.height / 2))
+                        Some((from.x.saturating_sub(2), from.y + from.height / 2))
                     }
                 }
             } else {
@@ -511,14 +536,26 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
 
                 // Calculate exit and entry points (and waypoints for back-edges)
                 let waypoints = if is_back_edge {
-                    // Route back-edges around the diagram
-                    let route_x = max_width + 2; // Route 2 cells past right edge
+                    let shared_subgraph = database
+                        .node_subgraph(&edge.from)
+                        .filter(|s| s.members.contains(&edge.to))
+                        .map(|s| s.id.as_str());
+                    let inside = shared_subgraph.and_then(|id| member_bounds.get(id));
+                    if let Some(id) = shared_subgraph {
+                        routed_inside.insert(id);
+                    }
+                    let route_x = inside.map_or(max_width + 2, |b| b.2 + 1);
+                    let route_y = inside.map_or(max_height + 2, |b| b.3 + 1);
+                    // LOCAL PATCH (ah-r): the entry point was one cell past the
+                    // target box, and the arrowhead is drawn one cell before the
+                    // entry point, so it floated one cell away from the box. Enter
+                    // at the box border so the arrowhead lands against the box.
                     match direction {
                         Direction::TopDown => {
                             // Exit from right side, go right, up, left, enter from right
                             let exit_x = from.x + from.width;
                             let exit_y = from.y + from.height / 2;
-                            let entry_x = to.x + to.width;
+                            let entry_x = to.x + to.width - 1;
                             let entry_y = to.y + to.height / 2;
                             vec![
                                 (exit_x, exit_y),
@@ -530,7 +567,7 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                         Direction::BottomUp => {
                             let exit_x = from.x + from.width;
                             let exit_y = from.y + from.height / 2;
-                            let entry_x = to.x + to.width;
+                            let entry_x = to.x + to.width - 1;
                             let entry_y = to.y + to.height / 2;
                             vec![
                                 (exit_x, exit_y),
@@ -540,11 +577,10 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                             ]
                         }
                         Direction::LeftRight => {
-                            let route_y = max_height + 2;
                             let exit_x = from.x + from.width / 2;
                             let exit_y = from.y + from.height;
                             let entry_x = to.x + to.width / 2;
-                            let entry_y = to.y + to.height;
+                            let entry_y = to.y + to.height - 1;
                             vec![
                                 (exit_x, exit_y),
                                 (exit_x, route_y),
@@ -553,11 +589,10 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                             ]
                         }
                         Direction::RightLeft => {
-                            let route_y = max_height + 2;
                             let exit_x = from.x + from.width / 2;
                             let exit_y = from.y + from.height;
                             let entry_x = to.x + to.width / 2;
-                            let entry_y = to.y + to.height;
+                            let entry_y = to.y + to.height - 1;
                             vec![
                                 (exit_x, exit_y),
                                 (exit_x, route_y),
@@ -567,7 +602,10 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                         }
                     }
                 } else {
-                    // Normal forward edge
+                    // LOCAL PATCH (ah-r): TD/LR enter at the target's border and
+                    // draw the arrowhead one cell before it, against the box. BT/RL
+                    // entered one cell past the border, so their arrowhead floated
+                    // one cell away. Enter at the border as TD/LR do.
                     let (exit_x, exit_y, entry_x, entry_y) = match direction {
                         Direction::TopDown => (
                             from.x + from.width / 2,
@@ -579,7 +617,7 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                             from.x + from.width / 2,
                             from.y,
                             to.x + to.width / 2,
-                            to.y + to.height,
+                            to.y + to.height - 1,
                         ),
                         Direction::LeftRight => (
                             from.x + from.width,
@@ -590,7 +628,7 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                         Direction::RightLeft => (
                             from.x,
                             from.y + from.height / 2,
-                            to.x + to.width,
+                            to.x + to.width - 1,
                             to.y + to.height / 2,
                         ),
                     };
@@ -618,12 +656,6 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
         let subgraph_span = span!(Level::DEBUG, "calculate_subgraphs");
         let _subgraph_enter = subgraph_span.enter();
 
-        // Build a lookup for positioned nodes by ID
-        let node_positions: HashMap<&str, &PositionedNode> = positioned_nodes
-            .iter()
-            .map(|n| (n.id.as_str(), n))
-            .collect();
-
         let mut positioned_subgraphs = Vec::new();
         for subgraph in database.subgraphs() {
             if subgraph.members.is_empty() {
@@ -640,37 +672,30 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
                 continue;
             }
 
-            // Find bounding box of all member nodes
-            let mut min_x = usize::MAX;
-            let mut min_y = usize::MAX;
-            let mut max_x = 0usize;
-            let mut max_y = 0usize;
-
-            for member_id in &subgraph.members {
-                if let Some(node) = node_positions.get(member_id.as_str()) {
-                    min_x = min_x.min(node.x);
-                    min_y = min_y.min(node.y);
-                    max_x = max_x.max(node.x + node.width);
-                    max_y = max_y.max(node.y + node.height);
-                }
-            }
-
-            if min_x == usize::MAX {
+            let Some(&(min_x, min_y, max_x, max_y)) = member_bounds.get(subgraph.id.as_str())
+            else {
                 // No members found (shouldn't happen, but defensive)
                 continue;
-            }
+            };
 
             // Add padding for border: more breathing room around nodes
             let border_padding = 2; // padding around nodes inside subgraph
             let title_height = 1; // row for title
+            // The inside route runs 1 cell past the members; keep 1 blank cell
+            // between it and the frame.
+            let (route_width, route_height) = match (routed_inside.contains(subgraph.id.as_str()), direction) {
+                (false, _) => (0, 0),
+                (true, Direction::TopDown | Direction::BottomUp) => (2, 0),
+                (true, Direction::LeftRight | Direction::RightLeft) => (0, 2),
+            };
 
             positioned_subgraphs.push(PositionedSubgraph {
                 id: subgraph.id.clone(),
                 title: subgraph.title.clone(),
                 x: min_x.saturating_sub(border_padding),
                 y: min_y.saturating_sub(border_padding + title_height),
-                width: (max_x - min_x) + border_padding * 2,
-                height: (max_y - min_y) + border_padding * 2 + title_height,
+                width: (max_x - min_x) + border_padding * 2 + route_width,
+                height: (max_y - min_y) + border_padding * 2 + title_height + route_height,
             });
         }
         debug!(
@@ -683,8 +708,14 @@ impl LayoutAlgorithm<FlowchartDatabase> for FlowchartLayoutAlgorithm {
         let has_back_edges = positioned_edges.iter().any(|e| e.waypoints.len() > 2);
         let back_edge_margin = if has_back_edges { 4 } else { 0 }; // route_x uses max_width + 2
 
-        let final_width = max_width + self.config.padding + back_edge_margin;
-        let final_height = max_height + self.config.padding;
+        // LOCAL PATCH (ah-r): LR/RL route back edges below the diagram, but the
+        // margin only widened it, so the route fell off the bottom of the canvas.
+        let (width_margin, height_margin) = match direction {
+            Direction::TopDown | Direction::BottomUp => (back_edge_margin, 0),
+            Direction::LeftRight | Direction::RightLeft => (0, back_edge_margin),
+        };
+        let final_width = max_width + self.config.padding + width_margin;
+        let final_height = max_height + self.config.padding + height_margin;
         info!(
             node_count = positioned_nodes.len(),
             edge_count = positioned_edges.len(),

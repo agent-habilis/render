@@ -785,7 +785,9 @@ impl FlowchartRenderer {
             if y2 > y1 {
                 // Going down: vertical first, then horizontal, then down to target
                 // Turn point needs to be high enough to leave room for arrow segment
-                let turn_y = y2.saturating_sub(2).max(y1 + 1); // At least 2 rows above target
+                // LOCAL PATCH (ah-r): was 2 rows above the target, which left only
+                // the arrowhead below the corner. Match a split branch instead.
+                let turn_y = y2.saturating_sub(4).max(y1 + 1);
 
                 // Vertical segment from source down to turn point
                 self.draw_vertical_line(canvas, x1, y1, turn_y, &chars);
@@ -989,13 +991,44 @@ impl FlowchartRenderer {
         }
     }
 
-    fn draw_edge_label(&self, canvas: &mut AsciiCanvas, waypoints: &[(usize, usize)], label: &str) {
+    fn draw_edge_label(
+        &self,
+        canvas: &mut AsciiCanvas,
+        waypoints: &[(usize, usize)],
+        label: &str,
+        direction: crate::core::Direction,
+        target_left: usize,
+    ) {
+        use unicode_width::UnicodeWidthStr;
+
         if waypoints.len() < 2 || label.is_empty() {
             return;
         }
 
         let (x1, y1) = waypoints[0];
         let (x2, y2) = waypoints[waypoints.len() - 1];
+
+        // LOCAL PATCH (ah-r): a TD/BT branch label was drawn on the branch line
+        // itself, right behind the arrowhead, so the arrowhead had no line cell
+        // to attach to. Put it beside the line cell that follows the corner, on
+        // the side away from the junction. A left label must stay above its own
+        // target box, or it runs into the previous branch or the subgraph frame.
+        let vertical_flow = matches!(
+            direction,
+            crate::core::Direction::TopDown | crate::core::Direction::BottomUp
+        );
+        if vertical_flow && waypoints.len() == 2 && x1 != x2 {
+            let label_y = if y2 > y1 { y2.saturating_sub(3) } else { y2 + 3 };
+            let left_x = x2
+                .checked_sub(UnicodeWidthStr::width(label) + 1)
+                .filter(|&x| x >= target_left);
+            let label_x = match left_x {
+                Some(x) if x2 < x1 => x,
+                _ => x2 + 2,
+            };
+            canvas.draw_text(label_x, label_y, label);
+            return;
+        }
 
         if y1 == y2 {
             // Horizontal edge: place label above if possible, otherwise below
@@ -1023,8 +1056,9 @@ impl FlowchartRenderer {
                     let label_x = x2.saturating_sub(label.len() + 1);
                     canvas.draw_text(label_x, label_y, label);
                 } else {
-                    // Right branch: label to the right
-                    let label_x = x2 + 1;
+                    // LOCAL PATCH (ah-r): was x2 + 1. A back edge now enters at
+                    // the box border, so keep one cell between box and label.
+                    let label_x = x2 + 2;
                     canvas.draw_text(label_x, label_y, label);
                 }
             } else if x2 > x1 {
@@ -1755,7 +1789,7 @@ impl Renderer<FlowchartDatabase> for FlowchartRenderer {
             std::collections::HashSet::new();
 
         // Collect labels to draw after all edges (so labels don't interfere with edge drawing)
-        let mut labels_to_draw: Vec<(Vec<(usize, usize)>, String)> = Vec::new();
+        let mut labels_to_draw: Vec<(Vec<(usize, usize)>, String, usize)> = Vec::new();
 
         // First pass: draw all edge lines
         for edge in &layout.edges {
@@ -1792,9 +1826,15 @@ impl Renderer<FlowchartDatabase> for FlowchartRenderer {
                 };
                 let tc = match database.direction() {
                     crate::core::Direction::TopDown => (to.x + to.width / 2, to.y),
-                    crate::core::Direction::BottomUp => (to.x + to.width / 2, to.y + to.height),
+                    // LOCAL PATCH (ah-r): enter BT/RL at the box border, matching
+                    // the layout's entry points.
+                    crate::core::Direction::BottomUp => {
+                        (to.x + to.width / 2, to.y + to.height - 1)
+                    }
                     crate::core::Direction::LeftRight => (to.x, to.y + to.height / 2),
-                    crate::core::Direction::RightLeft => (to.x + to.width, to.y + to.height / 2),
+                    crate::core::Direction::RightLeft => {
+                        (to.x + to.width - 1, to.y + to.height / 2)
+                    }
                 };
                 (Some(fc), Some(tc))
             } else {
@@ -1877,14 +1917,21 @@ impl Renderer<FlowchartDatabase> for FlowchartRenderer {
 
             // Collect label for later drawing
             if let Some(label) = edge_label {
-                labels_to_draw.push((edge.waypoints.clone(), label.to_string()));
+                let target_left = to_node.map_or(0, |n| n.x);
+                labels_to_draw.push((edge.waypoints.clone(), label.to_string(), target_left));
             }
             edges_drawn += 1;
         }
 
         // Second pass: draw all labels (after edge lines, so they overlay correctly)
-        for (waypoints, label) in &labels_to_draw {
-            self.draw_edge_label(&mut canvas, waypoints, label);
+        for (waypoints, label, target_left) in &labels_to_draw {
+            self.draw_edge_label(
+                &mut canvas,
+                waypoints,
+                label,
+                database.direction(),
+                *target_left,
+            );
         }
         debug!(edges_drawn, "Drew edges");
         drop(_edge_enter);
